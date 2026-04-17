@@ -4,6 +4,9 @@ on:
   push:
     branches-ignore:
       - main
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 concurrency:
   group: prerelease-${{ github.ref_name }}
