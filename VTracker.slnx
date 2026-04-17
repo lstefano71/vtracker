@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VTracker.Cli/VTracker.Cli.csproj" />
+    <Project Path="src/VTracker.Core/VTracker.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VTracker.Tests/VTracker.Tests.csproj" />
+  </Folder>
+</Solution>

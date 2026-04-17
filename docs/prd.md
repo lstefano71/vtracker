@@ -79,6 +79,7 @@ If the caller does not explicitly provide an output path, the default output bas
 - A file is considered updated only when its SHA-256 changes.
 - PE version fields are captured for `.dll` and `.exe` files when available.
 - Missing PE version info is represented as `null`.
+- Per-step timing data is not included in manifest provenance in v1.
 
 ## User Stories
 
@@ -184,6 +185,14 @@ The compare command must provide:
 - Human-readable text output by default
 - Optional JSON output for automation
 
+JSON compare output uses a structured object with:
+
+- `summary`
+- `added`
+- `removed`
+- `updated`
+- `provenanceDifferences`
+
 ### FR-10: Exit Codes
 The compare command must return:
 
@@ -224,7 +233,7 @@ The implementation should avoid reflection-heavy patterns and use libraries and 
 
 ## Proposed CLI Surface
 
-The exact executable name is TBD. Examples below use `vtracker`.
+The executable name is `vtracker`.
 
 ### Extract
 ```powershell
@@ -277,7 +286,3 @@ vtracker compare `
 - ZIP compression can dominate wall-clock time after hashing is optimized.
 - Native AOT compatibility must be validated early for any chosen CLI parsing library.
 
-## Open Implementation Questions
-- Final executable name
-- Exact JSON shape for compare output
-- Whether to include per-step timing data in the manifest provenance

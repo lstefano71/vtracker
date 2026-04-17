@@ -1,0 +1,107 @@
+using VTracker.Core;
+
+namespace VTracker.Tests;
+
+public sealed class ManifestComparatorTests
+{
+    [Fact]
+    public void Compare_ClassifiesFileAndProvenanceDifferencesSeparately()
+    {
+        var comparator = new ManifestComparator();
+
+        var left = CreateManifest(
+            sourcePath: @"D:\releases\release-1\setup.msi",
+            sourceHash: "aaaa",
+            patches: Array.Empty<ManifestPatchInfo>(),
+            files:
+            [
+                CreateFile("bin/common.dll", "1111", 10, "1.0.0.0"),
+                CreateFile("bin/removed.dll", "2222", 20),
+            ]);
+
+        var right = CreateManifest(
+            sourcePath: @"D:\releases\release-2\setup.msi",
+            sourceHash: "bbbb",
+            patches:
+            [
+                new ManifestPatchInfo
+                {
+                    Sequence = 1,
+                    Path = @"D:\releases\release-2\patch.msp",
+                    Sha256 = "cccc",
+                },
+            ],
+            files:
+            [
+                CreateFile("bin/common.dll", "9999", 99, "2.0.0.0"),
+                CreateFile("bin/added.dll", "3333", 30),
+            ]);
+
+        var result = comparator.Compare(left, right);
+
+        Assert.Equal(["bin/added.dll"], result.Added);
+        Assert.Equal(["bin/removed.dll"], result.Removed);
+        var updated = Assert.Single(result.Updated);
+        Assert.Equal("bin/common.dll", updated.Path);
+        Assert.Equal("1111", updated.Left.Sha256);
+        Assert.Equal("9999", updated.Right.Sha256);
+        Assert.Contains("Source MSI path differs.", result.ProvenanceDifferences);
+        Assert.Contains("Source MSI hash differs.", result.ProvenanceDifferences);
+        Assert.Contains("Patch list differs.", result.ProvenanceDifferences);
+    }
+
+    [Fact]
+    public async Task CompareService_RejectsMissingInputsWithFriendlyExceptions()
+    {
+        var repository = new ManifestRepository(new PathNormalizer(), new PathCollisionValidator());
+        var service = new CompareService(repository, new ManifestComparator());
+
+        var exception = await Assert.ThrowsAsync<VTrackerException>(
+            () => service.CompareAsync(
+                new CompareRequest(
+                    @"D:\missing-left.json",
+                    @"D:\missing-right.json",
+                    OutputFormat.Text),
+                CancellationToken.None));
+
+        Assert.Contains("Left input", exception.Message);
+    }
+
+    private static ManifestDocument CreateManifest(string sourcePath, string sourceHash, ManifestPatchInfo[] patches, ManifestFileEntry[] files)
+    {
+        return new ManifestDocument
+        {
+            Tool = new ManifestToolInfo
+            {
+                Name = "vtracker",
+                Version = "1.0.0",
+            },
+            Source = new ManifestSourceInfo
+            {
+                MsiPath = sourcePath,
+                MsiSha256 = sourceHash,
+            },
+            Patches = patches,
+            Extraction = new ManifestExtractionInfo
+            {
+                Mode = "administrative-image",
+                WorkDirKept = false,
+                Compression = "Optimal",
+            },
+            Files = files,
+        };
+    }
+
+    private static ManifestFileEntry CreateFile(string path, string sha256, long size, string? fileVersion = null)
+    {
+        return new ManifestFileEntry
+        {
+            Path = path,
+            LastWriteTimeUtc = DateTime.SpecifyKind(new DateTime(2026, 4, 17, 0, 0, 0), DateTimeKind.Utc),
+            Size = size,
+            Sha256 = sha256,
+            FileVersion = fileVersion,
+            ProductVersion = fileVersion,
+        };
+    }
+}

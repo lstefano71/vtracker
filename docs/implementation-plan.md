@@ -62,6 +62,8 @@ Responsibilities:
 
 ## Command Design
 
+The CLI executable name is `vtracker`.
+
 ## `extract`
 Recommended options:
 
@@ -154,8 +156,7 @@ Suggested shape:
   "extraction": {
     "mode": "administrative-image",
     "workDirKept": false,
-    "compression": "Optimal",
-    "generatedAtUtc": "2026-04-17T00:00:00Z"
+    "compression": "Optimal"
   },
   "files": [
     {
@@ -176,6 +177,7 @@ Suggested shape:
 - `size` is byte size as a 64-bit integer.
 - `sha256` is lowercase hex.
 - `fileVersion` and `productVersion` are nullable strings.
+- Per-step timing data is intentionally omitted from manifest provenance in v1.
 
 ### Compare Result Shape
 Suggested model:
