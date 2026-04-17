@@ -1,3 +1,4 @@
+using Humanizer;
 using Spectre.Console;
 using VTracker.Core;
 
@@ -61,43 +62,79 @@ public static class ComparePrettyFormatter
             console.MarkupLine($"[red]-[/] {Markup.Escape(path)}");
         }
 
-        foreach (var update in result.Updated)
-        {
-            console.MarkupLine($"[yellow]~[/] {Markup.Escape(update.Path)}");
-            WriteUpdatedDetail(console, update);
-        }
+        WriteUpdatedFiles(console, result.Updated);
 
         foreach (var difference in result.ProvenanceDifferences)
         {
-            console.MarkupLine($"[grey]![/] {Markup.Escape(difference)}");
+            console.MarkupLine($"[orange3]![/] {Markup.Escape(difference)}");
         }
     }
 
-    private static void WriteUpdatedDetail(IAnsiConsole console, CompareUpdatedFile update)
+    private static void WriteUpdatedFiles(IAnsiConsole console, CompareUpdatedFile[] updated)
     {
-        var leftSize = FormatSize(update.Left.Size);
-        var rightSize = FormatSize(update.Right.Size);
-        var sizeChange = update.Left.Size == update.Right.Size
-            ? $"  size: {leftSize}"
-            : $"  size: {leftSize} → {rightSize}";
-        console.MarkupLine($"[grey]{Markup.Escape(sizeChange)}[/]");
+        if (updated.Length == 0) return;
 
+        // Pre-compute plain-text size strings so we can measure the widest one
+        // for column alignment before emitting any markup.
+        var leftSizes = Array.ConvertAll(updated, u => HumanizeBytes(u.Left.Size));
+        var rightSizes = Array.ConvertAll(updated, u => HumanizeBytes(u.Right.Size));
+
+        // Visual width of the size-change field: "X.X MB → Y.Y MB" or just "X.X MB"
+        var sizeFieldWidths = new int[updated.Length];
+        for (var i = 0; i < updated.Length; i++)
+        {
+            sizeFieldWidths[i] = updated[i].Left.Size == updated[i].Right.Size
+                ? leftSizes[i].Length
+                : leftSizes[i].Length + 3 + rightSizes[i].Length; // " → " = 3 visible chars
+        }
+        var maxSizeFieldWidth = sizeFieldWidths.Max();
+
+        for (var i = 0; i < updated.Length; i++)
+        {
+            var update = updated[i];
+
+            console.MarkupLine($"[yellow]~[/] {Markup.Escape(update.Path)}");
+
+            // ── size part (markup) ──────────────────────────────────────────
+            string sizePart;
+            if (update.Left.Size == update.Right.Size)
+            {
+                sizePart = $"[dim]{Markup.Escape(leftSizes[i])}[/]";
+            }
+            else
+            {
+                sizePart = $"[yellow]{Markup.Escape(leftSizes[i])}[/] [dim]→[/] [green]{Markup.Escape(rightSizes[i])}[/]";
+            }
+
+            // ── version part (markup, null when no version on either side) ──
+            var versionPart = BuildVersionPart(update);
+
+            if (versionPart is not null)
+            {
+                var padding = new string(' ', maxSizeFieldWidth - sizeFieldWidths[i] + 2);
+                console.MarkupLine($"  {sizePart}{padding}{versionPart}");
+            }
+            else
+            {
+                console.MarkupLine($"  {sizePart}");
+            }
+        }
+    }
+
+    private static string? BuildVersionPart(CompareUpdatedFile update)
+    {
         var leftVer = update.Left.FileVersion ?? update.Left.ProductVersion;
         var rightVer = update.Right.FileVersion ?? update.Right.ProductVersion;
-        if (leftVer is not null || rightVer is not null)
-        {
-            var verDisplay = leftVer == rightVer
-                ? $"  version: {leftVer ?? "(none)"}"
-                : $"  version: {leftVer ?? "(none)"} → {rightVer ?? "(none)"}";
-            console.MarkupLine($"[grey]{Markup.Escape(verDisplay)}[/]");
-        }
+
+        if (leftVer is null && rightVer is null)
+            return null;
+
+        if (leftVer == rightVer)
+            return $"[dim]{Markup.Escape(leftVer!)}[/]";
+
+        return $"[yellow]{Markup.Escape(leftVer ?? "(none)")}[/] [dim]→[/] [green]{Markup.Escape(rightVer ?? "(none)")}[/]";
     }
 
-    private static string FormatSize(long bytes) =>
-        bytes switch
-        {
-            < 1024 => $"{bytes} B",
-            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
-            _ => $"{bytes / (1024.0 * 1024):F1} MB",
-        };
+    private static string HumanizeBytes(long bytes) =>
+        ByteSize.FromBytes(bytes).Humanize();
 }
