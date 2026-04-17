@@ -25,4 +25,17 @@ public interface IExtractProgressReporter
         string description,
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Wraps an extraction step that provides incremental status updates.
+    /// The action receives a callback it can invoke to update the displayed status text.
+    /// Implementations that do not support live status can ignore the updates.
+    /// </summary>
+    Task RunWithStatusAsync(
+        string description,
+        Func<Action<string>, CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        return RunAsync(description, ct => action(_ => { }, ct), cancellationToken);
+    }
 }

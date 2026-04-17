@@ -1,4 +1,5 @@
 using Spectre.Console;
+using Spectre.Console.Rendering;
 using VTracker.Core;
 
 namespace VTracker.Cli;
@@ -27,7 +28,7 @@ public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
     {
         try
         {
-            await RunWithSpinnerAsync(description, logPath, action, cancellationToken);
+            await RunWithLiveTailAsync(description, logPath, action, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -51,7 +52,13 @@ public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
     {
         try
         {
-            await RunWithSpinnerAsync(description, logPath: null, action, cancellationToken);
+            await _console.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync(
+                    $"[blue]{Markup.Escape(description)}[/]",
+                    async ctx => await action(cancellationToken));
+
+            _console.MarkupLine($"[green]✓[/] {Markup.Escape(description)}");
         }
         catch (OperationCanceledException)
         {
@@ -67,67 +74,124 @@ public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
         }
     }
 
-    private async Task RunWithSpinnerAsync(
+    public async Task RunWithStatusAsync(
         string description,
-        string? logPath,
-        Func<CancellationToken, Task> action,
+        Func<Action<string>, CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
-        if (logPath is not null)
-        {
-            // Use Live display for multi-line log tail — Status is single-line only.
-            var maxLineWidth = Math.Max(20, _console.Profile.Width - 4);
-            var tailLines = new List<string>();
-
-            await _console.Live(BuildTailRenderable(description, tailLines))
-                .AutoClear(true)
-                .StartAsync(async ctx =>
-                {
-                    using var tailCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    var tailTask = TailLogAsync(
-                        logPath,
-                        line =>
-                        {
-                            tailLines.Add(TruncateLine(line, maxLineWidth));
-                            if (tailLines.Count > TailLineCount)
-                                tailLines.RemoveAt(0);
-                            ctx.UpdateTarget(BuildTailRenderable(description, tailLines));
-                        },
-                        tailCts.Token);
-
-                    try
-                    {
-                        await action(cancellationToken);
-                    }
-                    finally
-                    {
-                        await tailCts.CancelAsync();
-                        try { await tailTask; } catch { /* swallow tail failure — never fails extract */ }
-                    }
-                });
-        }
-        else
+        try
         {
             await _console.Status()
                 .Spinner(Spinner.Known.Dots)
                 .StartAsync(
                     $"[blue]{Markup.Escape(description)}[/]",
-                    async ctx => await action(cancellationToken));
+                    async ctx =>
+                    {
+                        var escapedDesc = Markup.Escape(description);
+                        await action(
+                            status => ctx.Status = $"[blue]{escapedDesc}[/] [grey]— {Markup.Escape(TruncateLine(status, 60))}[/]",
+                            cancellationToken);
+                    });
+
+            _console.MarkupLine($"[green]✓[/] {Markup.Escape(description)}");
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (VTrackerException)
+        {
+            throw;
+        }
+        catch
+        {
+            await PlainRunAsync(description, ct => action(_ => { }, ct), cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Uses Spectre Live display with a fixed-height renderable and a
+    /// dedicated render loop. The tail callback only mutates shared state
+    /// under a lock; all <c>ctx.UpdateTarget</c> calls happen from the
+    /// render loop on the Live callback's own async context.
+    /// </summary>
+    private async Task RunWithLiveTailAsync(
+        string description,
+        string logPath,
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken)
+    {
+        // Leave margin to prevent any line wrapping that breaks Live redraw.
+        var maxLineWidth = Math.Max(20, _console.Profile.Width - 6);
+        var tailLines = new List<string>(TailLineCount);
+        var tailLock = new object();
+
+        await _console.Live(BuildTailRenderable(description, [], maxLineWidth))
+            .AutoClear(true)
+            .Overflow(VerticalOverflow.Crop)
+            .StartAsync(async ctx =>
+            {
+                using var tailCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+                // The tail callback only buffers lines under a lock — no Spectre calls.
+                var tailTask = TailLogAsync(
+                    logPath,
+                    line =>
+                    {
+                        var truncated = TruncateLine(line, maxLineWidth - 2);
+                        lock (tailLock)
+                        {
+                            tailLines.Add(truncated);
+                            if (tailLines.Count > TailLineCount)
+                                tailLines.RemoveAt(0);
+                        }
+                    },
+                    tailCts.Token);
+
+                var actionTask = action(cancellationToken);
+
+                // Render loop: poll every 150 ms, refresh from this context only.
+                while (!actionTask.IsCompleted)
+                {
+                    await Task.WhenAny(actionTask, Task.Delay(150, CancellationToken.None));
+                    List<string> snapshot;
+                    lock (tailLock) { snapshot = [.. tailLines]; }
+                    ctx.UpdateTarget(BuildTailRenderable(description, snapshot, maxLineWidth));
+                }
+
+                await actionTask; // observe / propagate exceptions
+
+                await tailCts.CancelAsync();
+                try { await tailTask; } catch { /* swallow tail failure — never fails extract */ }
+
+                // Final flush so the last few lines are visible briefly.
+                List<string> finalSnapshot;
+                lock (tailLock) { finalSnapshot = [.. tailLines]; }
+                ctx.UpdateTarget(BuildTailRenderable(description, finalSnapshot, maxLineWidth));
+            });
 
         _console.MarkupLine($"[green]✓[/] {Markup.Escape(description)}");
     }
 
-    private static Rows BuildTailRenderable(string description, List<string> tailLines)
+    /// <summary>
+    /// Builds a fixed-height renderable: one description row plus
+    /// <see cref="TailLineCount"/> tail rows (padded with spaces when empty).
+    /// Uses <see cref="Text"/> instead of <see cref="Markup"/> so that raw
+    /// log content never needs escaping and cannot cause width surprises.
+    /// </summary>
+    private static IRenderable BuildTailRenderable(
+        string description,
+        IReadOnlyList<string> tailLines,
+        int maxLineWidth)
     {
-        var parts = new Markup[TailLineCount + 1];
-        parts[0] = new Markup($"[blue]◆ {Markup.Escape(description)}[/]");
+        var parts = new IRenderable[TailLineCount + 1];
+        parts[0] = new Text(TruncateLine($"◆ {description}", maxLineWidth), new Style(Color.Blue));
 
         for (var i = 0; i < TailLineCount; i++)
         {
             parts[i + 1] = i < tailLines.Count
-                ? new Markup($"  [grey]{Markup.Escape(tailLines[i])}[/]")
-                : new Markup("");
+                ? new Text($"  {tailLines[i]}", new Style(Color.Grey))
+                : new Text(" "); // non-empty to guarantee stable row height
         }
 
         return new Rows(parts);

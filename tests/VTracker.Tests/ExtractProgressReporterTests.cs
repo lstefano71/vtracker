@@ -61,7 +61,7 @@ public sealed class ExtractProgressReporterTests
         await reporter.RunWithLogTailAsync("Creating administrative image", "01-admin-image.log", ct => Task.CompletedTask, CancellationToken.None);
         await reporter.RunWithLogTailAsync("Applying patch 1 of 1: patch.msp", "02-patch-001.log", ct => Task.CompletedTask, CancellationToken.None);
         await reporter.RunAsync("Collecting file metadata", ct => Task.CompletedTask, CancellationToken.None);
-        await reporter.RunAsync("Creating archive", ct => Task.CompletedTask, CancellationToken.None);
+        await reporter.RunWithStatusAsync("Creating archive", (_, ct) => Task.CompletedTask, CancellationToken.None);
 
         Assert.Equal(4, reporter.Steps.Count);
         Assert.Equal("Creating administrative image", reporter.Steps[0].Description);
@@ -86,6 +86,12 @@ public sealed class ExtractProgressReporterTests
         {
             Steps.Add((description, null));
             return action(cancellationToken);
+        }
+
+        public Task RunWithStatusAsync(string description, Func<Action<string>, CancellationToken, Task> action, CancellationToken cancellationToken)
+        {
+            Steps.Add((description, null));
+            return action(_ => { }, cancellationToken);
         }
     }
 }

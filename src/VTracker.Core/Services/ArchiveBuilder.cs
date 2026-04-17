@@ -11,13 +11,16 @@ public sealed class ArchiveBuilder(ManifestRepository manifestRepository)
         string imageRootPath,
         string logsDirectory,
         ManifestDocument manifest,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<int, int, string>? onFileProgress = null)
     {
         await using var archiveStream = new FileStream(archivePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: false);
 
-        foreach (var file in manifest.Files)
+        for (var i = 0; i < manifest.Files.Length; i++)
         {
+            var file = manifest.Files[i];
+            onFileProgress?.Invoke(i + 1, manifest.Files.Length, file.Path);
             var sourcePath = Path.Combine(imageRootPath, file.Path.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(sourcePath))
             {

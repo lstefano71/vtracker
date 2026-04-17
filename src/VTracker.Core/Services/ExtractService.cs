@@ -93,9 +93,15 @@ public sealed class ExtractService(
             await manifestRepository.WriteToPathAsync(manifest, outputPaths.StagingManifestPath, cancellationToken);
         }
 
-        await _progress.RunAsync(
+        await _progress.RunWithStatusAsync(
             "Creating archive",
-            ct => archiveBuilder.CreateAsync(outputPaths.StagingArchivePath, workspace.ImageDirectory, workspace.LogsDirectory, manifest, ct),
+            (updateStatus, ct) => archiveBuilder.CreateAsync(
+                outputPaths.StagingArchivePath,
+                workspace.ImageDirectory,
+                workspace.LogsDirectory,
+                manifest,
+                ct,
+                (current, total, fileName) => updateStatus($"{current} of {total}: {Path.GetFileName(fileName)}")),
             cancellationToken);
 
         if (outputPaths.StagingManifestPath is not null && outputPaths.ManifestPath is not null)
