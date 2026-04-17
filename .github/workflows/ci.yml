@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      - name: Validate AOT publish
+        run: dotnet publish src/VTracker.Cli/VTracker.Cli.csproj -c Release -r win-x64 -p:PublishAot=true -o ./publish-aot
+
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          ./publish-aot/vtracker.exe --help
+          ./publish-aot/vtracker.exe extract --help
+          ./publish-aot/vtracker.exe compare --help

@@ -7,7 +7,7 @@ try
 {
     var toolIdentity = new ToolIdentity(
         "vtracker",
-        typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0");
+        ThisAssembly.AssemblyInformationalVersion);
 
     var app = ConsoleApp.Create()
         .ConfigureServices(services =>
@@ -28,6 +28,7 @@ try
             services.AddSingleton<ExtractService>();
         });
 
+    app.UseFilter<StartupBannerFilter>();
     app.UseFilter<UserFacingErrorFilter>();
     app.Run(args);
     return Environment.ExitCode;

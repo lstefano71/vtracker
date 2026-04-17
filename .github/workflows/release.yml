@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag commit is on main
+        shell: pwsh
+        run: |
+          $isOnMain = git branch -r --contains "${{ github.ref_name }}" | Where-Object { $_ -match 'origin/main' }
+          if (-not $isOnMain) {
+            throw "Tag ${{ github.ref_name }} is not reachable from origin/main. Official releases must be tagged on main."
+          }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Native AOT
+        run: dotnet publish src/VTracker.Cli/VTracker.Cli.csproj -c Release -r win-x64 -p:PublishAot=true -o ./publish
+
+      - name: Create release archive
+        id: archive
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zip = "vtracker-$tag-win-x64.zip"
+          Compress-Archive -Path ./publish/vtracker.exe -DestinationPath $zip
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Compute checksum
+        shell: pwsh
+        run: |
+          $zip = "${{ steps.archive.outputs.zip }}"
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Set-Content "$zip.sha256"
+
+      - name: Generate release notes
+        shell: pwsh
+        run: |
+          $prevTag = git tag --list 'v*' --sort=-version:refname |
+            Where-Object { $_ -ne "${{ github.ref_name }}" } |
+            Select-Object -First 1
+          if ($prevTag) {
+            git log --pretty=format:"- %s" "$prevTag..${{ github.ref_name }}" | Set-Content RELEASE_NOTES.md
+          } else {
+            git log --pretty=format:"- %s" | Set-Content RELEASE_NOTES.md
+          }
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            ${{ steps.archive.outputs.zip }}
+            ${{ steps.archive.outputs.zip }}.sha256

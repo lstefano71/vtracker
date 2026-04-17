@@ -1,0 +1,87 @@
+name: Prerelease
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+concurrency:
+  group: prerelease-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  prerelease:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute identifiers
+        id: id
+        shell: pwsh
+        run: |
+          $sha = git rev-parse --short HEAD
+          $branch = "${{ github.ref_name }}"
+          $safeBranch = $branch -replace '[^a-zA-Z0-9._-]', '-'
+          $assetBase = "vtracker-$safeBranch-$sha-win-x64"
+          "sha=$sha" >> $env:GITHUB_OUTPUT
+          "tag=prerelease/$branch" >> $env:GITHUB_OUTPUT
+          "asset_base=$assetBase" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Native AOT
+        run: dotnet publish src/VTracker.Cli/VTracker.Cli.csproj -c Release -r win-x64 -p:PublishAot=true -o ./publish
+
+      - name: Create prerelease archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path ./publish/vtracker.exe -DestinationPath "${{ steps.id.outputs.asset_base }}.zip"
+
+      - name: Compute checksum
+        shell: pwsh
+        run: |
+          $zip = "${{ steps.id.outputs.asset_base }}.zip"
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Set-Content "$zip.sha256"
+
+      - name: Generate prerelease notes
+        shell: pwsh
+        run: |
+          $branch = "${{ github.ref_name }}"
+          $sha = "${{ steps.id.outputs.sha }}"
+          $mergeBase = git merge-base origin/main HEAD 2>$null
+          if ($mergeBase) {
+            $commits = git log --pretty=format:"- %s" "$mergeBase..HEAD"
+          } else {
+            $commits = git log --pretty=format:"- %s" HEAD
+          }
+          if (-not $commits) { $commits = "*(no new commits ahead of main)*" }
+          @"
+          Preview build from branch ``$branch`` at commit ``$sha``.
+
+          ### Changes on this branch
+          $commits
+          "@ | Set-Content PRERELEASE_NOTES.md
+
+      - name: Update rolling prerelease tag
+        shell: pwsh
+        run: |
+          git tag -f "${{ steps.id.outputs.tag }}"
+          git push origin "${{ steps.id.outputs.tag }}" --force
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.id.outputs.tag }}
+          name: "prerelease/${{ github.ref_name }} @ ${{ steps.id.outputs.sha }}"
+          body_path: PRERELEASE_NOTES.md
+          prerelease: true
+          make_latest: false
+          files: |
+            ${{ steps.id.outputs.asset_base }}.zip
+            ${{ steps.id.outputs.asset_base }}.zip.sha256
