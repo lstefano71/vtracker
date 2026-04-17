@@ -11,6 +11,7 @@ namespace VTracker.Cli;
 /// </summary>
 public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
 {
+    private const int TailLineCount = 5;
     private readonly IAnsiConsole _console;
 
     public SpectreExtractProgressReporter(IAnsiConsole console)
@@ -72,40 +73,64 @@ public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken)
     {
-        await _console.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync(
-                $"[blue]{Markup.Escape(description)}[/]",
-                async ctx =>
-                {
-                    if (logPath is not null)
-                    {
-                        // Tail the log file in a concurrent background loop.
-                        // ctx.Status is intentionally updated from both this Task
-                        // and the rendering timer — string assignment is atomic in .NET.
-                        using var tailCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                        var tailTask = TailLogAsync(
-                            logPath,
-                            line => ctx.Status = $"[grey]{Markup.Escape(TruncateLine(line, 100))}[/]",
-                            tailCts.Token);
+        if (logPath is not null)
+        {
+            // Use Live display for multi-line log tail — Status is single-line only.
+            var maxLineWidth = Math.Max(20, _console.Profile.Width - 4);
+            var tailLines = new List<string>();
 
-                        try
+            await _console.Live(BuildTailRenderable(description, tailLines))
+                .AutoClear(true)
+                .StartAsync(async ctx =>
+                {
+                    using var tailCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    var tailTask = TailLogAsync(
+                        logPath,
+                        line =>
                         {
-                            await action(cancellationToken);
-                        }
-                        finally
-                        {
-                            await tailCts.CancelAsync();
-                            try { await tailTask; } catch { /* swallow tail failure — never fails extract */ }
-                        }
-                    }
-                    else
+                            tailLines.Add(TruncateLine(line, maxLineWidth));
+                            if (tailLines.Count > TailLineCount)
+                                tailLines.RemoveAt(0);
+                            ctx.UpdateTarget(BuildTailRenderable(description, tailLines));
+                        },
+                        tailCts.Token);
+
+                    try
                     {
                         await action(cancellationToken);
                     }
+                    finally
+                    {
+                        await tailCts.CancelAsync();
+                        try { await tailTask; } catch { /* swallow tail failure — never fails extract */ }
+                    }
                 });
+        }
+        else
+        {
+            await _console.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync(
+                    $"[blue]{Markup.Escape(description)}[/]",
+                    async ctx => await action(cancellationToken));
+        }
 
         _console.MarkupLine($"[green]✓[/] {Markup.Escape(description)}");
+    }
+
+    private static Rows BuildTailRenderable(string description, List<string> tailLines)
+    {
+        var parts = new Markup[TailLineCount + 1];
+        parts[0] = new Markup($"[blue]◆ {Markup.Escape(description)}[/]");
+
+        for (var i = 0; i < TailLineCount; i++)
+        {
+            parts[i + 1] = i < tailLines.Count
+                ? new Markup($"  [grey]{Markup.Escape(tailLines[i])}[/]")
+                : new Markup("");
+        }
+
+        return new Rows(parts);
     }
 
     private static async Task TailLogAsync(
