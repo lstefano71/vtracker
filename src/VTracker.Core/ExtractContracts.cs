@@ -9,7 +9,8 @@ public sealed record ExtractRequest(
     string? WorkDirectory,
     bool KeepWorkDirectory,
     bool EmitManifest,
-    int? MaxParallelism);
+    int? MaxParallelism,
+    string? CatalogPath = null);
 
 public sealed record ExtractResult(
     string ArchivePath,
@@ -20,4 +21,5 @@ public sealed record ExtractResult(
 
 public sealed record CompareRequest(
     string LeftPath,
-    string RightPath);
+    string RightPath,
+    string? CatalogPath = null);

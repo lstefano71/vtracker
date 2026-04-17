@@ -8,6 +8,8 @@ public sealed class ExtractService(
     ManifestBuilder manifestBuilder,
     ManifestRepository manifestRepository,
     ArchiveBuilder archiveBuilder,
+    CatalogDiscovery catalogDiscovery,
+    CatalogParser catalogParser,
     IExtractProgressReporter? progressReporter = null)
 {
     private readonly IExtractProgressReporter _progress = progressReporter ?? NullExtractProgressReporter.Instance;
@@ -65,6 +67,9 @@ public sealed class ExtractService(
         }
 
         ManifestDocument manifest = null!;
+        var catalogPath = catalogDiscovery.Resolve(request.CatalogPath, Environment.CurrentDirectory);
+        CatalogFile? catalog = catalogPath is not null ? catalogParser.Parse(catalogPath) : null;
+
         await _progress.RunAsync(
             "Collecting file metadata",
             async ct =>
@@ -77,7 +82,8 @@ public sealed class ExtractService(
                         patchMetadata,
                         WorkDirectoryKept: !workspace.DeleteOnSuccess,
                         request.MaxParallelism,
-                        toolIdentity),
+                        toolIdentity,
+                        catalog),
                     ct);
             },
             cancellationToken);

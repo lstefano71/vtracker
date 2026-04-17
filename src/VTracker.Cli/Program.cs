@@ -33,12 +33,19 @@ try
             services.AddSingleton<HashService>();
             services.AddSingleton<PeVersionService>();
             services.AddSingleton<MsiexecRunner>();
+            services.AddSingleton<CatalogParser>();
+            services.AddSingleton<CatalogClassifier>();
+            services.AddSingleton<CatalogDiscovery>();
+            services.AddSingleton<CatalogWriter>();
+            services.AddSingleton<CatalogInitService>();
+            services.AddSingleton<CatalogCheckService>();
             services.AddSingleton<ManifestBuilder>();
             services.AddSingleton<ManifestRepository>();
             services.AddSingleton<ArchiveBuilder>();
             services.AddSingleton<ManifestComparator>();
             services.AddSingleton<CompareService>();
             services.AddSingleton<ExtractService>();
+            services.AddSingleton<UnpackService>();
 
             // Use the richer reporter for interactive terminals; plain text otherwise
             if (!Console.IsOutputRedirected)

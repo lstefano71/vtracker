@@ -45,8 +45,8 @@ public sealed class CompareTextFormatterTests
         var result = new CompareResult
         {
             Summary = new CompareSummary { Added = 1, Removed = 1, Updated = 1, ProvenanceDifferences = 1 },
-            Added = ["bin/new.dll"],
-            Removed = ["bin/old.dll"],
+            Added = [new CompareAddedFile { Path = "bin/new.dll" }],
+            Removed = [new CompareRemovedFile { Path = "bin/old.dll" }],
             Updated =
             [
                 new CompareUpdatedFile
@@ -78,8 +78,8 @@ public sealed class CompareTextFormatterTests
                 Updated = updated,
                 ProvenanceDifferences = 0,
             },
-            Added = Enumerable.Range(0, added).Select(i => $"bin/added{i}.dll").ToArray(),
-            Removed = Enumerable.Range(0, removed).Select(i => $"bin/removed{i}.dll").ToArray(),
+            Added = Enumerable.Range(0, added).Select(i => new CompareAddedFile { Path = $"bin/added{i}.dll" }).ToArray(),
+            Removed = Enumerable.Range(0, removed).Select(i => new CompareRemovedFile { Path = $"bin/removed{i}.dll" }).ToArray(),
             Updated = [],
             ProvenanceDifferences = [],
         };

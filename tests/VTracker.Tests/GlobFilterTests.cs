@@ -19,11 +19,16 @@ public sealed class GlobFilterTests
     }
 
     [Fact]
-    public void FilterPaths_EmptyPatterns_ReturnsAllPaths()
+    public void FilterAdded_EmptyPatterns_ReturnsAllEntries()
     {
-        string[] paths = ["bin/a.dll", "bin/b.exe", "config.ini"];
-        var result = GlobFilter.FilterPaths(paths, []);
-        Assert.Equal(paths, result);
+        CompareAddedFile[] entries =
+        [
+            new() { Path = "bin/a.dll" },
+            new() { Path = "bin/b.exe" },
+            new() { Path = "config.ini" },
+        ];
+        var result = GlobFilter.FilterAdded(entries, []);
+        Assert.Equal(3, result.Length);
     }
 
     // ── case-insensitive matching ────────────────────────────────────────────
@@ -70,19 +75,30 @@ public sealed class GlobFilterTests
     // ── FilterPaths / FilterUpdated with active patterns ─────────────────────
 
     [Fact]
-    public void FilterPaths_WithPattern_RetainsOnlyMatchingPaths()
+    public void FilterAdded_WithPattern_RetainsOnlyMatchingEntries()
     {
-        string[] paths = ["bin/a.dll", "bin/b.exe", "config/settings.ini"];
-        var result = GlobFilter.FilterPaths(paths, ["**/*.dll"]);
-        Assert.Equal(["bin/a.dll"], result);
+        CompareAddedFile[] entries =
+        [
+            new() { Path = "bin/a.dll" },
+            new() { Path = "bin/b.exe" },
+            new() { Path = "config/settings.ini" },
+        ];
+        var result = GlobFilter.FilterAdded(entries, ["**/*.dll"]);
+        Assert.Single(result);
+        Assert.Equal("bin/a.dll", result[0].Path);
     }
 
     [Fact]
-    public void FilterPaths_RepeatedPatterns_ORSemantics()
+    public void FilterRemoved_RepeatedPatterns_ORSemantics()
     {
-        string[] paths = ["bin/a.dll", "bin/b.exe", "config/settings.ini"];
-        var result = GlobFilter.FilterPaths(paths, ["**/*.dll", "**/*.exe"]);
-        Assert.Equal(["bin/a.dll", "bin/b.exe"], result);
+        CompareRemovedFile[] entries =
+        [
+            new() { Path = "bin/a.dll" },
+            new() { Path = "bin/b.exe" },
+            new() { Path = "config/settings.ini" },
+        ];
+        var result = GlobFilter.FilterRemoved(entries, ["**/*.dll", "**/*.exe"]);
+        Assert.Equal(2, result.Length);
     }
 
     [Fact]

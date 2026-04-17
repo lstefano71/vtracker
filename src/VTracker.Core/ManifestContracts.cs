@@ -70,4 +70,11 @@ public sealed class ManifestFileEntry
     public string? FileVersion { get; init; }
 
     public string? ProductVersion { get; init; }
+
+    /// <summary>
+    /// Catalog-assigned category. Present only in schema-version-2 manifests produced
+    /// with <c>--catalog</c>. <c>null</c> when no catalog was active or in v1 manifests.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Category { get; init; }
 }

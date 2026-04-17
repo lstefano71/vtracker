@@ -7,6 +7,9 @@ namespace VTracker.Core;
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(ManifestDocument))]
 [JsonSerializable(typeof(CompareResult))]
+[JsonSerializable(typeof(CompareAddedFile))]
+[JsonSerializable(typeof(CompareRemovedFile))]
+[JsonSerializable(typeof(CompareCategoryBreakdown))]
 public partial class VTrackerJsonContext : JsonSerializerContext
 {
 }

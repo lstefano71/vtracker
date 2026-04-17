@@ -21,6 +21,7 @@ public sealed class VTrackerCommands(
     /// <param name="keepWorkDir">Keep the work directory after a successful run.</param>
     /// <param name="emitManifest">Write an external .manifest.json beside the ZIP archive.</param>
     /// <param name="maxParallelism">Maximum degree of parallelism for hashing and metadata collection.</param>
+    /// <param name="catalog">Path to a catalog CSV file for category classification. Auto-discovers vtracker.catalog.csv from CWD when omitted.</param>
     [Command("extract")]
     public async Task<int> Extract(
         string msi,
@@ -30,6 +31,7 @@ public sealed class VTrackerCommands(
         bool keepWorkDir = false,
         bool emitManifest = false,
         int? maxParallelism = null,
+        string? catalog = null,
         CancellationToken cancellationToken = default)
     {
         var result = await extractService.ExtractAsync(
@@ -40,7 +42,8 @@ public sealed class VTrackerCommands(
                 workDir,
                 keepWorkDir,
                 emitManifest,
-                maxParallelism),
+                maxParallelism,
+                catalog),
             toolIdentity,
             cancellationToken);
 
@@ -66,22 +69,24 @@ public sealed class VTrackerCommands(
     /// <param name="right">Right-hand input path (.zip or .json).</param>
     /// <param name="include">Glob pattern to filter displayed files. Repeat for OR semantics (e.g. --include "**/*.dll"). Summary counts are always shown in full.</param>
     /// <param name="format">Output format: text, json, or pretty. Defaults to pretty for interactive terminals and text otherwise.</param>
+    /// <param name="catalog">Path to a catalog CSV file for per-category breakdown. Auto-discovers vtracker.catalog.csv from CWD when omitted.</param>
     [Command("compare")]
     public async Task<int> Compare(
         string left,
         string right,
         string[]? include = null,
         CompareOutputFormat? format = null,
+        string? catalog = null,
         CancellationToken cancellationToken = default)
     {
         var effectiveFormat = format ?? (Console.IsOutputRedirected ? CompareOutputFormat.Text : CompareOutputFormat.Pretty);
 
-        var result = await compareService.CompareAsync(new CompareRequest(left, right), cancellationToken);
+        var result = await compareService.CompareAsync(new CompareRequest(left, right, catalog), cancellationToken);
 
         // Apply include filters — provenance differences are never filtered (they are not file paths)
         var patterns = include ?? Array.Empty<string>();
-        var filteredAdded = GlobFilter.FilterPaths(result.Added, patterns);
-        var filteredRemoved = GlobFilter.FilterPaths(result.Removed, patterns);
+        var filteredAdded = GlobFilter.FilterAdded(result.Added, patterns);
+        var filteredRemoved = GlobFilter.FilterRemoved(result.Removed, patterns);
         var filteredUpdated = GlobFilter.FilterUpdated(result.Updated, patterns);
 
         var hiddenCount = (result.Added.Length - filteredAdded.Length)

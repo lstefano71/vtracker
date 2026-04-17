@@ -2,7 +2,9 @@ namespace VTracker.Core;
 
 public sealed class CompareService(
     ManifestRepository manifestRepository,
-    ManifestComparator manifestComparator)
+    ManifestComparator manifestComparator,
+    CatalogDiscovery catalogDiscovery,
+    CatalogParser catalogParser)
 {
     public async Task<CompareResult> CompareAsync(CompareRequest request, CancellationToken cancellationToken)
     {
@@ -13,7 +15,11 @@ public sealed class CompareService(
 
         var leftManifest = await manifestRepository.LoadFromPathAsync(leftPath, cancellationToken);
         var rightManifest = await manifestRepository.LoadFromPathAsync(rightPath, cancellationToken);
-        return manifestComparator.Compare(leftManifest, rightManifest);
+
+        var catalogPath = catalogDiscovery.Resolve(request.CatalogPath, Environment.CurrentDirectory);
+        CatalogFile? catalog = catalogPath is not null ? catalogParser.Parse(catalogPath) : null;
+
+        return manifestComparator.Compare(leftManifest, rightManifest, catalog);
     }
 
     private static string ValidateComparisonInput(string path, string description)

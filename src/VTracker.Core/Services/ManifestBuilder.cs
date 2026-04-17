@@ -7,13 +7,15 @@ public sealed record ManifestBuildRequest(
     IReadOnlyList<ManifestPatchInfo> Patches,
     bool WorkDirectoryKept,
     int? MaxParallelism,
-    ToolIdentity Tool);
+    ToolIdentity Tool,
+    CatalogFile? Catalog = null);
 
 public sealed class ManifestBuilder(
     PathNormalizer pathNormalizer,
     PathCollisionValidator pathCollisionValidator,
     HashService hashService,
-    PeVersionService peVersionService)
+    PeVersionService peVersionService,
+    CatalogClassifier catalogClassifier)
 {
     public async Task<ManifestDocument> BuildAsync(ManifestBuildRequest request, CancellationToken cancellationToken)
     {
@@ -39,6 +41,12 @@ public sealed class ManifestBuilder(
                 var hash = await hashService.ComputeSha256Async(preparedFile.PhysicalPath, ct);
                 var versionInfo = peVersionService.Read(preparedFile.PhysicalPath);
 
+                string? category = null;
+                if (request.Catalog is not null)
+                {
+                    category = catalogClassifier.Classify(request.Catalog, preparedFile.ManifestPath);
+                }
+
                 entries[index] = new ManifestFileEntry
                 {
                     Path = preparedFile.ManifestPath,
@@ -47,6 +55,7 @@ public sealed class ManifestBuilder(
                     Sha256 = hash,
                     FileVersion = versionInfo.FileVersion,
                     ProductVersion = versionInfo.ProductVersion,
+                    Category = category,
                 };
             });
 
@@ -57,6 +66,7 @@ public sealed class ManifestBuilder(
 
         return new ManifestDocument
         {
+            SchemaVersion = request.Catalog is not null ? 2 : 1,
             Tool = new ManifestToolInfo
             {
                 Name = request.Tool.Name,

@@ -16,7 +16,8 @@ public sealed class ManifestBuilderTests
             new PathNormalizer(),
             new PathCollisionValidator(),
             new HashService(),
-            new PeVersionService());
+            new PeVersionService(),
+            new CatalogClassifier());
 
         var manifest = await builder.BuildAsync(
             new ManifestBuildRequest(

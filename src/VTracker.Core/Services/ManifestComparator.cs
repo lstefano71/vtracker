@@ -1,8 +1,8 @@
 namespace VTracker.Core;
 
-public sealed class ManifestComparator
+public sealed class ManifestComparator(CatalogClassifier catalogClassifier)
 {
-    public CompareResult Compare(ManifestDocument left, ManifestDocument right)
+    public CompareResult Compare(ManifestDocument left, ManifestDocument right, CatalogFile? catalog = null)
     {
         ArgumentNullException.ThrowIfNull(left);
         ArgumentNullException.ThrowIfNull(right);
@@ -14,16 +14,29 @@ public sealed class ManifestComparator
             .Except(leftFiles.Keys, StringComparer.OrdinalIgnoreCase)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ThenBy(path => path, StringComparer.Ordinal)
+            .Select(path => new CompareAddedFile
+            {
+                Path = path,
+                Category = ResolveCategory(rightFiles[path], path, catalog),
+            })
             .ToArray();
 
         var removed = leftFiles.Keys
             .Except(rightFiles.Keys, StringComparer.OrdinalIgnoreCase)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ThenBy(path => path, StringComparer.Ordinal)
+            .Select(path => new CompareRemovedFile
+            {
+                Path = path,
+                Category = ResolveCategory(leftFiles[path], path, catalog),
+            })
             .ToArray();
 
-        var updated = leftFiles.Keys
+        var commonPaths = leftFiles.Keys
             .Intersect(rightFiles.Keys, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var updated = commonPaths
             .Select(path => (Path: path, Left: leftFiles[path], Right: rightFiles[path]))
             .Where(item => !string.Equals(item.Left.Sha256, item.Right.Sha256, StringComparison.OrdinalIgnoreCase))
             .Select(item => new CompareUpdatedFile
@@ -31,12 +44,60 @@ public sealed class ManifestComparator
                 Path = item.Path,
                 Left = CreateSnapshot(item.Left),
                 Right = CreateSnapshot(item.Right),
+                Category = ResolveCategory(item.Right, item.Path, catalog),
             })
             .OrderBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
             .ThenBy(item => item.Path, StringComparer.Ordinal)
             .ToArray();
 
         var provenanceDifferences = CompareProvenance(left, right);
+
+        // Detect category-only differences (same path, same SHA, different stored category)
+        if (catalog is not null)
+        {
+            var categoryDiffs = commonPaths
+                .Where(path =>
+                {
+                    var leftCat = leftFiles[path].Category;
+                    var rightCat = rightFiles[path].Category;
+                    return !string.Equals(leftCat, rightCat, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(leftFiles[path].Sha256, rightFiles[path].Sha256, StringComparison.OrdinalIgnoreCase);
+                })
+                .Select(path =>
+                {
+                    var leftCat = leftFiles[path].Category ?? "(none)";
+                    var rightCat = rightFiles[path].Category ?? "(none)";
+                    return $"Category changed for '{path}': '{leftCat}' → '{rightCat}'.";
+                })
+                .ToArray();
+
+            if (categoryDiffs.Length > 0)
+            {
+                provenanceDifferences = [.. provenanceDifferences, .. categoryDiffs];
+            }
+        }
+
+        // Build per-category breakdown when catalog is active
+        CompareCategoryBreakdown[]? categoryBreakdown = null;
+        if (catalog is not null)
+        {
+            var allCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var a in added) if (a.Category is not null) allCategories.Add(a.Category);
+            foreach (var r in removed) if (r.Category is not null) allCategories.Add(r.Category);
+            foreach (var u in updated) if (u.Category is not null) allCategories.Add(u.Category);
+
+            categoryBreakdown = allCategories
+                .OrderBy(c => c, StringComparer.OrdinalIgnoreCase)
+                .Select(cat => new CompareCategoryBreakdown
+                {
+                    Category = cat,
+                    Added = added.Count(a => string.Equals(a.Category, cat, StringComparison.OrdinalIgnoreCase)),
+                    Removed = removed.Count(r => string.Equals(r.Category, cat, StringComparison.OrdinalIgnoreCase)),
+                    Updated = updated.Count(u => string.Equals(u.Category, cat, StringComparison.OrdinalIgnoreCase)),
+                })
+                .ToArray();
+        }
+
         return new CompareResult
         {
             Summary = new CompareSummary
@@ -45,12 +106,27 @@ public sealed class ManifestComparator
                 Removed = removed.Length,
                 Updated = updated.Length,
                 ProvenanceDifferences = provenanceDifferences.Length,
+                CategoryBreakdown = categoryBreakdown,
             },
             Added = added,
             Removed = removed,
             Updated = updated,
             ProvenanceDifferences = provenanceDifferences,
         };
+    }
+
+    /// <summary>
+    /// Resolves the category for a file: catalog classification takes precedence,
+    /// then stored manifest category, then null (no catalog active).
+    /// </summary>
+    private string? ResolveCategory(ManifestFileEntry entry, string path, CatalogFile? catalog)
+    {
+        if (catalog is not null)
+        {
+            return catalogClassifier.Classify(catalog, path);
+        }
+
+        return entry.Category;
     }
 
     private static CompareFileSnapshot CreateSnapshot(ManifestFileEntry file)

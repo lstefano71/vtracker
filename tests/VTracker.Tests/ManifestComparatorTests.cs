@@ -7,7 +7,7 @@ public sealed class ManifestComparatorTests
     [Fact]
     public void Compare_ClassifiesFileAndProvenanceDifferencesSeparately()
     {
-        var comparator = new ManifestComparator();
+        var comparator = new ManifestComparator(new CatalogClassifier());
 
         var left = CreateManifest(
             sourcePath: @"D:\releases\release-1\setup.msi",
@@ -39,8 +39,8 @@ public sealed class ManifestComparatorTests
 
         var result = comparator.Compare(left, right);
 
-        Assert.Equal(["bin/added.dll"], result.Added);
-        Assert.Equal(["bin/removed.dll"], result.Removed);
+        Assert.Equal(["bin/added.dll"], result.Added.Select(a => a.Path).ToArray());
+        Assert.Equal(["bin/removed.dll"], result.Removed.Select(r => r.Path).ToArray());
         var updated = Assert.Single(result.Updated);
         Assert.Equal("bin/common.dll", updated.Path);
         Assert.Equal("1111", updated.Left.Sha256);
@@ -54,7 +54,8 @@ public sealed class ManifestComparatorTests
     public async Task CompareService_RejectsMissingInputsWithFriendlyExceptions()
     {
         var repository = new ManifestRepository(new PathNormalizer(), new PathCollisionValidator());
-        var service = new CompareService(repository, new ManifestComparator());
+        var classifier = new CatalogClassifier();
+        var service = new CompareService(repository, new ManifestComparator(classifier), new CatalogDiscovery(), new CatalogParser());
 
         var exception = await Assert.ThrowsAsync<VTrackerException>(
             () => service.CompareAsync(
@@ -69,7 +70,7 @@ public sealed class ManifestComparatorTests
     [Fact]
     public void Compare_CreatedUtcDifferenceIsNotAProvenanceDifference()
     {
-        var comparator = new ManifestComparator();
+        var comparator = new ManifestComparator(new CatalogClassifier());
 
         var left = CreateManifest(@"D:\releases\r1\setup.msi", "aaaa", Array.Empty<ManifestPatchInfo>(), []);
         var right = CreateManifest(@"D:\releases\r1\setup.msi", "aaaa", Array.Empty<ManifestPatchInfo>(), []);

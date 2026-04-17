@@ -37,17 +37,35 @@ public static class GlobFilter
     }
 
     /// <summary>
-    /// Filters an array of file paths to those matching any of the given patterns.
-    /// When <paramref name="patterns"/> is empty, all paths are returned unchanged.
+    /// Filters an array of added-file entries to those whose paths match any of the given patterns.
+    /// When <paramref name="patterns"/> is empty, all entries are returned unchanged.
     /// </summary>
-    public static string[] FilterPaths(IReadOnlyList<string> paths, IReadOnlyList<string> patterns)
+    public static CompareAddedFile[] FilterAdded(
+        IReadOnlyList<CompareAddedFile> entries,
+        IReadOnlyList<string> patterns)
     {
         if (patterns is null || patterns.Count == 0)
         {
-            return paths is string[] arr ? arr : [.. paths];
+            return entries is CompareAddedFile[] arr ? arr : [.. entries];
         }
 
-        return [.. paths.Where(p => MatchesAny(p, patterns))];
+        return [.. entries.Where(e => MatchesAny(e.Path, patterns))];
+    }
+
+    /// <summary>
+    /// Filters an array of removed-file entries to those whose paths match any of the given patterns.
+    /// When <paramref name="patterns"/> is empty, all entries are returned unchanged.
+    /// </summary>
+    public static CompareRemovedFile[] FilterRemoved(
+        IReadOnlyList<CompareRemovedFile> entries,
+        IReadOnlyList<string> patterns)
+    {
+        if (patterns is null || patterns.Count == 0)
+        {
+            return entries is CompareRemovedFile[] arr ? arr : [.. entries];
+        }
+
+        return [.. entries.Where(e => MatchesAny(e.Path, patterns))];
     }
 
     /// <summary>

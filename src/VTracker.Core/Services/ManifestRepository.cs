@@ -60,7 +60,7 @@ public sealed class ManifestRepository(
             throw new ManifestValidationException($"Manifest '{sourcePath}' could not be read.");
         }
 
-        if (manifest.SchemaVersion != 1)
+        if (manifest.SchemaVersion < 1 || manifest.SchemaVersion > 2)
         {
             throw new ManifestValidationException($"Manifest '{sourcePath}' uses unsupported schema version '{manifest.SchemaVersion}'.");
         }
@@ -116,6 +116,7 @@ public sealed class ManifestRepository(
                 Sha256 = file.Sha256.ToLowerInvariant(),
                 FileVersion = NormalizeOptionalValue(file.FileVersion),
                 ProductVersion = NormalizeOptionalValue(file.ProductVersion),
+                Category = NormalizeOptionalValue(file.Category),
             };
         }
 

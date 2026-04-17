@@ -74,6 +74,7 @@ Recommended options:
 - `--keep-work-dir` (optional)
 - `--emit-manifest` (optional)
 - `--max-parallelism <n>` (optional)
+- `--catalog <path>` (optional) — path to a catalog CSV for file classification
 
 Default behavior:
 
@@ -88,12 +89,65 @@ Recommended options:
 - `--left <path>` (required)
 - `--right <path>` (required)
 - `--format <text|json>` (optional, default `text`)
+- `--catalog <path>` (optional) — path to a catalog CSV for per-category breakdown
 
 Behavior:
 
 - Accept ZIPs and standalone manifest files.
 - Return `0` on a successful comparison, even when differences exist.
 - Return nonzero only on actual errors.
+- When a catalog is active, output includes a per-category breakdown of added/removed/updated files. Category-only differences (same SHA-256, different stored category) are reported as provenance differences.
+
+## `unpack`
+Options:
+
+- `--from <path>` (required) — source ZIP archive
+- `--catalog <path>` (optional) — auto-discovers `vtracker.catalog.csv` in CWD when omitted
+- `--category <name>` (required) — category name to extract (case-insensitive)
+- `--out <dir>` (required) — output directory
+- `--strip-prefix <prefix>` (optional) — path prefix to strip from extracted paths
+- `--dry-run` (optional) — print extraction plan without writing files
+
+Behavior:
+
+- Requires a catalog (explicit or auto-discovered).
+- Loads `_manifest.json` from the ZIP, classifies files by catalog, filters to the requested category.
+- Computes the longest common directory prefix across matching files.
+- In interactive mode, prompts to strip the detected common prefix when `--strip-prefix` is omitted.
+- `--dry-run` shows a source → destination mapping table without writing files.
+- Rejects `.json` paths with a clear error directing the user to use the corresponding ZIP.
+
+## `catalog` Subcommand Group
+
+### `catalog init`
+- `--manifest <path>` (required) — manifest or ZIP to seed from
+- `--out <path>` (required) — output catalog CSV
+
+Creates one exact-path glob row per file, all assigned to `Unclassified`, sorted by path.
+
+### `catalog check`
+- `--catalog <path>` (required) — catalog CSV to validate
+- `--manifest <path>` (required) — manifest or ZIP to check against
+
+Reports catalog patterns that match zero files in the manifest.
+
+### `catalog compact`
+- `--catalog <path>` (required) — catalog CSV to compact
+- `--manifest <path>` (optional) — manifest to validate replacement patterns against
+
+Interactive TTY command. Groups exact-path entries by category, prompts for a replacement glob pattern per group, and rewrites the catalog.
+
+### `catalog export`
+- `--catalog <path>` (required) — source catalog CSV
+- `--out <path>` (required) — output CSV path
+
+Re-serialises the catalog through the writer to normalise quoting and escaping.
+
+### `catalog show`
+- `--catalog <path>` (required) — catalog CSV to display
+- `--category <name>` (optional) — filter to a specific category
+
+Renders catalog entries as a Spectre.Console table in interactive mode, or plain CSV in piped mode.
 
 ## Native AOT Strategy
 
@@ -137,7 +191,7 @@ Suggested shape:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "tool": {
     "name": "vtracker",
     "version": "1.0.0"
@@ -165,11 +219,14 @@ Suggested shape:
       "size": 123456,
       "sha256": "...",
       "fileVersion": "19.0.49959.0",
-      "productVersion": "19.0"
+      "productVersion": "19.0",
+      "category": "Runtime"
     }
   ]
 }
 ```
+
+Schema version 1 manifests have no `category` field. Schema version 2 manifests include `category` on every file entry (set when a catalog is active during `extract`). Supported versions: 1 and 2. The `category` field is omitted from JSON when null (`JsonIgnoreCondition.WhenWritingNull`).
 
 ### File Entry Rules
 - `path` is relative, normalized to `/`, and compared case-insensitively.
@@ -188,17 +245,22 @@ Suggested model:
     "added": 12,
     "removed": 3,
     "updated": 27,
-    "provenanceDifferences": 2
+    "provenanceDifferences": 2,
+    "categoryBreakdown": [
+      { "category": "Runtime", "added": 8, "removed": 1, "updated": 20 },
+      { "category": "Unclassified", "added": 4, "removed": 2, "updated": 7 }
+    ]
   },
   "added": [
-    "bin/new.dll"
+    { "path": "bin/new.dll", "category": "Runtime" }
   ],
   "removed": [
-    "bin/old.dll"
+    { "path": "bin/old.dll", "category": "Runtime" }
   ],
   "updated": [
     {
       "path": "bin/aplcore.dll",
+      "category": "Runtime",
       "left": {
         "sha256": "...",
         "size": 123456,
@@ -218,6 +280,8 @@ Suggested model:
   ]
 }
 ```
+
+The `categoryBreakdown` and `category` fields are present only when a catalog is active. Without a catalog, `added` and `removed` entries still use the object form (`{ path, category }`) but `category` is null and omitted from JSON.
 
 ## Extraction Workflow
 
@@ -450,7 +514,13 @@ Avoid introducing a heavy logging framework unless the repository already uses o
 - `ManifestDocument`
 - `ManifestFileEntry`
 - `CompareResult`
-- `UpdatedFileEntry`
+- `CompareAddedFile`
+- `CompareRemovedFile`
+- `CompareUpdatedFile` (was `UpdatedFileEntry`)
+- `CompareCategoryBreakdown`
+- `CatalogRow`, `CatalogRowType`, `CompiledCatalogEntry`, `CatalogFile`
+- `UnpackRequest`, `UnpackFileMapping`, `UnpackResult`
+- `CatalogCheckResult`, `CatalogCheckDeadEntry`
 
 ### Services
 - `MsiexecRunner`
@@ -464,6 +534,13 @@ Avoid introducing a heavy logging framework unless the repository already uses o
 - `ManifestComparator`
 - `WorkspaceManager`
 - `PathNormalizer`
+- `CatalogParser` — RFC 4180 CSV parsing with `Sep`
+- `CatalogClassifier` — First-match-wins file classification
+- `CatalogDiscovery` — Resolves explicit `--catalog` or auto-discovers `vtracker.catalog.csv`
+- `CatalogWriter` — RFC 4180 CSV writing with proper quoting
+- `CatalogInitService` — Seeds a catalog from a manifest
+- `CatalogCheckService` — Reports dead catalog patterns
+- `UnpackService` — Category-filtered extraction from ZIP archives
 
 ### Utility Helpers
 - `OutputNameResolver`
@@ -646,3 +723,11 @@ The implementation is done when:
 6. `compare` reports adds, removes, updates, and provenance differences.
 7. Work directories and logs are retained on failure.
 8. The CLI publishes successfully with Native AOT on Windows.
+9. `extract --catalog` classifies files and produces schema version 2 manifests with categories.
+10. `compare --catalog` produces per-category breakdown and annotates added/removed/updated with categories.
+11. `catalog init` seeds a catalog from a manifest with all entries as `Unclassified`.
+12. `catalog check` reports dead patterns matching zero files.
+13. `catalog compact` interactively replaces exact-path entries with broader patterns.
+14. `catalog export` re-serialises a catalog with normalised quoting.
+15. `catalog show` displays catalog entries as a table, optionally filtered by category.
+16. `unpack` extracts files by category from a ZIP, with optional prefix stripping and dry-run support.

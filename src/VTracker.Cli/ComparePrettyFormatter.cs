@@ -48,18 +48,44 @@ public static class ComparePrettyFormatter
         table.AddRow("[grey]Provenance differences[/]", summary.ProvenanceDifferences.ToString());
 
         console.Write(table);
+
+        if (summary.CategoryBreakdown is { Length: > 0 } breakdown)
+        {
+            console.WriteLine();
+
+            var catTable = new Table()
+                .Border(TableBorder.Rounded)
+                .Title("[bold]Per-category breakdown[/]")
+                .AddColumn(new TableColumn("[bold]Category[/]").LeftAligned())
+                .AddColumn(new TableColumn("[bold green]+[/]").RightAligned())
+                .AddColumn(new TableColumn("[bold red]-[/]").RightAligned())
+                .AddColumn(new TableColumn("[bold yellow]~[/]").RightAligned());
+
+            foreach (var cat in breakdown)
+            {
+                catTable.AddRow(
+                    Markup.Escape(cat.Category),
+                    cat.Added.ToString(),
+                    cat.Removed.ToString(),
+                    cat.Updated.ToString());
+            }
+
+            console.Write(catTable);
+        }
     }
 
     private static void WriteDetails(IAnsiConsole console, CompareResult result)
     {
-        foreach (var path in result.Added)
+        foreach (var added in result.Added)
         {
-            console.MarkupLine($"[green]+[/] {Markup.Escape(path)}");
+            var catLabel = added.Category is not null ? $"  [dim][[{Markup.Escape(added.Category)}]][/]" : "";
+            console.MarkupLine($"[green]+[/] {Markup.Escape(added.Path)}{catLabel}");
         }
 
-        foreach (var path in result.Removed)
+        foreach (var removed in result.Removed)
         {
-            console.MarkupLine($"[red]-[/] {Markup.Escape(path)}");
+            var catLabel = removed.Category is not null ? $"  [dim][[{Markup.Escape(removed.Category)}]][/]" : "";
+            console.MarkupLine($"[red]-[/] {Markup.Escape(removed.Path)}{catLabel}");
         }
 
         WriteUpdatedFiles(console, result.Updated);
