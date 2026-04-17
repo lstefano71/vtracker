@@ -11,11 +11,16 @@ The current implementation contract remains in:
 
 Feature request files:
 
+**Implemented**
+
 - `01-versioning-with-nerdbank-gitversioning.md`
 - `02-github-release-pipeline.md`
 - `03-branch-prerelease-publishing.md`
+- `06-startup-version-banner.md`
+
+**Pending**
+
 - `04-archive-installer-logs.md`
 - `05-interactive-terminal-ui.md`
-- `06-startup-version-banner.md`
 - `07-manifest-extraction-created-utc.md`
 - `08-compare-filtering-and-pretty-output.md`

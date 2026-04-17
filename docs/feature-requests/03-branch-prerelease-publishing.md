@@ -1,7 +1,7 @@
 # Branch Prerelease Publishing
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Publish non-main builds in a way that is clearly distinct from official releases while still giving users a stable place to download the latest preview from a branch.

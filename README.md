@@ -16,6 +16,15 @@ VTracker is a Windows-only .NET 10 CLI for archiving and comparing MSI-delivered
 - .NET 10 SDK to build from source
 - Windows Installer (`msiexec.exe`), available on supported Windows systems
 
+## Versioning
+
+Version numbers are managed by [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning). The base `major.minor` is set in `version.json`; git commit height provides the build number automatically. The full informational version (e.g. `0.1.5-feature-name.5+gabcdef`) is embedded in every manifest under `tool.version` and shown in the startup banner for interactive sessions.
+
+## Releases
+
+- **Official releases** are tagged as `vX.Y.Z` on `main`. GitHub Actions publishes a win-x64 Native AOT ZIP and SHA-256 checksum to the GitHub Releases page.
+- **Branch prereleases** are published automatically on every push to a non-main branch as a rolling `prerelease/{branch}` GitHub prerelease.
+
 ## Build, test, publish
 
 ```powershell

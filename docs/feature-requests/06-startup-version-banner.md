@@ -1,7 +1,7 @@
 # Startup Version Banner
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Surface the exact build identity immediately when a human runs the tool.

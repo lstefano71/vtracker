@@ -1,7 +1,7 @@
 # Versioning with Nerdbank.GitVersioning
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Give every build a bug-reportable identity while keeping human control over major and minor version numbers.

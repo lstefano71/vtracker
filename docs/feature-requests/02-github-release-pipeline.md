@@ -1,7 +1,7 @@
 # GitHub Release Pipeline
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Publish official VTracker releases from GitHub Actions with stable assets and meaningful descriptions.
