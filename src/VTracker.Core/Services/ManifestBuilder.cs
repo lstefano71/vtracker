@@ -17,7 +17,10 @@ public sealed class ManifestBuilder(
     PeVersionService peVersionService,
     CatalogClassifier catalogClassifier)
 {
-    public async Task<ManifestDocument> BuildAsync(ManifestBuildRequest request, CancellationToken cancellationToken)
+    public async Task<ManifestDocument> BuildAsync(
+        ManifestBuildRequest request,
+        CancellationToken cancellationToken,
+        Action<int, int, string>? onFileProgress = null)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -27,6 +30,7 @@ public sealed class ManifestBuilder(
             : Math.Max(2, Environment.ProcessorCount - 1);
 
         var entries = new ManifestFileEntry[preparedFiles.Length];
+        var completedCount = 0;
         await Parallel.ForEachAsync(
             Enumerable.Range(0, preparedFiles.Length),
             new ParallelOptions
@@ -57,6 +61,12 @@ public sealed class ManifestBuilder(
                     ProductVersion = versionInfo.ProductVersion,
                     Category = category,
                 };
+
+                if (onFileProgress is not null)
+                {
+                    var completed = Interlocked.Increment(ref completedCount);
+                    onFileProgress(completed, preparedFiles.Length, preparedFile.ManifestPath);
+                }
             });
 
         var orderedFiles = entries

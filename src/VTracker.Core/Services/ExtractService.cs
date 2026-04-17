@@ -70,9 +70,9 @@ public sealed class ExtractService(
         var catalogPath = catalogDiscovery.Resolve(request.CatalogPath, Environment.CurrentDirectory);
         CatalogFile? catalog = catalogPath is not null ? catalogParser.Parse(catalogPath) : null;
 
-        await _progress.RunAsync(
+        await _progress.RunWithStatusAsync(
             "Collecting file metadata",
-            async ct =>
+            async (updateStatus, ct) =>
             {
                 manifest = await manifestBuilder.BuildAsync(
                     new ManifestBuildRequest(
@@ -84,7 +84,8 @@ public sealed class ExtractService(
                         request.MaxParallelism,
                         toolIdentity,
                         catalog),
-                    ct);
+                    ct,
+                    (current, total, fileName) => updateStatus($"{current} of {total}: {Path.GetFileName(fileName)}"));
             },
             cancellationToken);
 

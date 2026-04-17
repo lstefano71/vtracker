@@ -12,7 +12,7 @@ namespace VTracker.Cli;
 /// </summary>
 public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
 {
-    private const int TailLineCount = 5;
+    private const int TailLineCount = 10;
 
     private static readonly string[] SpinnerFrames =
         ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -80,7 +80,7 @@ public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
                     $"[blue]{Markup.Escape(description)}[/]",
                     async ctx => await action(cancellationToken));
 
-            _console.MarkupLine($"[green]✓[/] {Markup.Escape(description)}");
+            _console.MarkupLine($"[green]✓ {Markup.Escape(description)}[/]");
         }
         catch (OperationCanceledException)
         {
@@ -115,7 +115,7 @@ public sealed class SpectreExtractProgressReporter : IExtractProgressReporter
                             cancellationToken);
                     });
 
-            _console.MarkupLine($"[green]✓[/] {Markup.Escape(description)}");
+            _console.MarkupLine($"[green]✓ {Markup.Escape(description)}[/]");
         }
         catch (OperationCanceledException)
         {

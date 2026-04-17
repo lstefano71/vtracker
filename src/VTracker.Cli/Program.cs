@@ -11,7 +11,7 @@ Console.InputEncoding = Encoding.UTF8;
 // Show the banner in any interactive session that is not a machine-consumption
 // invocation (piped output or JSON format) and not a direct command run.
 // "Batch mode" = a real command verb (extract / compare) without --help.
-if (!Console.IsOutputRedirected && !IsJsonFormat(args) && !IsBatchMode(args))
+if (!Console.IsOutputRedirected && !IsJsonFormat(args))
 {
     PrintBanner();
 }
@@ -77,17 +77,6 @@ static void PrintBanner()
             .LeftJustified()
             .RuleStyle(Style.Parse("cyan1 dim")));
     AnsiConsole.WriteLine();
-}
-
-// True when the user passed a real command verb (first non-flag arg) and is
-// NOT asking for help — i.e. an automated / scripted invocation.
-static bool IsBatchMode(string[] a)
-{
-    if (a.Length == 0) return false;
-    if (a[0].StartsWith('-')) return false;
-    foreach (var arg in a)
-        if (arg is "--help" or "-h") return false;
-    return true;
 }
 
 static bool IsJsonFormat(string[] a)

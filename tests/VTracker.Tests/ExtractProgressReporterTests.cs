@@ -60,7 +60,7 @@ public sealed class ExtractProgressReporterTests
         // Simulate the sequence ExtractService would call
         await reporter.RunWithLogTailAsync("Creating administrative image", "01-admin-image.log", ct => Task.CompletedTask, CancellationToken.None);
         await reporter.RunWithLogTailAsync("Applying patch 1 of 1: patch.msp", "02-patch-001.log", ct => Task.CompletedTask, CancellationToken.None);
-        await reporter.RunAsync("Collecting file metadata", ct => Task.CompletedTask, CancellationToken.None);
+        await reporter.RunWithStatusAsync("Collecting file metadata", (_, ct) => Task.CompletedTask, CancellationToken.None);
         await reporter.RunWithStatusAsync("Creating archive", (_, ct) => Task.CompletedTask, CancellationToken.None);
 
         Assert.Equal(4, reporter.Steps.Count);
