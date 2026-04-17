@@ -25,7 +25,7 @@ public sealed class ArchiveBuilder(ManifestRepository manifestRepository)
             }
 
             var entry = archive.CreateEntry(file.Path, CompressionLevel.Optimal);
-            entry.LastWriteTime = ToZipTimestamp(file.LastWriteTimeUtc);
+            entry.LastWriteTime = ToZipTimestamp(file.LastWriteTimeUtc ?? DateTime.UtcNow);
 
             await using var sourceStream = new FileStream(
                 sourcePath,

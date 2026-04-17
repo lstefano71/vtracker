@@ -46,14 +46,22 @@ public sealed class ManifestExtractionInfo
 
     public required string Compression { get; init; }
 
-    public required DateTime CreatedUtc { get; init; }
+    /// <summary>
+    /// When the archive was created. Informational only; absent in manifests produced
+    /// before FR-07 and treated as <c>null</c> rather than a hard error.
+    /// </summary>
+    public DateTime? CreatedUtc { get; init; }
 }
 
 public sealed class ManifestFileEntry
 {
     public required string Path { get; init; }
 
-    public required DateTime LastWriteTimeUtc { get; init; }
+    /// <summary>
+    /// File last-write time in UTC. Informational only; <c>null</c> when absent in
+    /// older manifests. Never used as an identity or update signal.
+    /// </summary>
+    public DateTime? LastWriteTimeUtc { get; init; }
 
     public long Size { get; init; }
 

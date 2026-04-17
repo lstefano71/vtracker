@@ -111,7 +111,7 @@ public sealed class ManifestRepository(
             normalizedFiles[index] = new ManifestFileEntry
             {
                 Path = normalizedPath,
-                LastWriteTimeUtc = EnsureUtc(file.LastWriteTimeUtc),
+                LastWriteTimeUtc = file.LastWriteTimeUtc.HasValue ? EnsureUtc(file.LastWriteTimeUtc.Value) : null,
                 Size = file.Size,
                 Sha256 = file.Sha256.ToLowerInvariant(),
                 FileVersion = NormalizeOptionalValue(file.FileVersion),
