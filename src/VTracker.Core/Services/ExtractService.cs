@@ -7,8 +7,11 @@ public sealed class ExtractService(
     HashService hashService,
     ManifestBuilder manifestBuilder,
     ManifestRepository manifestRepository,
-    ArchiveBuilder archiveBuilder)
+    ArchiveBuilder archiveBuilder,
+    IExtractProgressReporter? progressReporter = null)
 {
+    private readonly IExtractProgressReporter _progress = progressReporter ?? NullExtractProgressReporter.Instance;
+
     public async Task<ExtractResult> ExtractAsync(
         ExtractRequest request,
         ToolIdentity toolIdentity,
@@ -31,13 +34,22 @@ public sealed class ExtractService(
         var workspace = workspaceManager.Create(request.WorkDirectory, request.KeepWorkDirectory);
 
         var adminLogPath = Path.Combine(workspace.LogsDirectory, "01-admin-image.log");
-        await msiexecRunner.CreateAdministrativeImageAsync(msiPath, workspace.ImageDirectory, adminLogPath, cancellationToken);
+        await _progress.RunWithLogTailAsync(
+            "Creating administrative image",
+            adminLogPath,
+            ct => msiexecRunner.CreateAdministrativeImageAsync(msiPath, workspace.ImageDirectory, adminLogPath, ct),
+            cancellationToken);
 
         var extractedMsiPath = LocateExtractedMsi(msiPath, workspace.ImageDirectory);
         for (var index = 0; index < patchPaths.Length; index++)
         {
             var patchLogPath = Path.Combine(workspace.LogsDirectory, $"02-patch-{index + 1:000}.log");
-            await msiexecRunner.ApplyPatchAsync(patchPaths[index], extractedMsiPath, patchLogPath, cancellationToken);
+            var patchIndex = index;
+            await _progress.RunWithLogTailAsync(
+                $"Applying patch {index + 1} of {patchPaths.Length}: {Path.GetFileName(patchPaths[index])}",
+                patchLogPath,
+                ct => msiexecRunner.ApplyPatchAsync(patchPaths[patchIndex], extractedMsiPath, patchLogPath, ct),
+                cancellationToken);
         }
 
         var sourceHash = await hashService.ComputeSha256Async(msiPath, cancellationToken);
@@ -52,15 +64,22 @@ public sealed class ExtractService(
             };
         }
 
-        var manifest = await manifestBuilder.BuildAsync(
-            new ManifestBuildRequest(
-                workspace.ImageDirectory,
-                msiPath,
-                sourceHash,
-                patchMetadata,
-                WorkDirectoryKept: !workspace.DeleteOnSuccess,
-                request.MaxParallelism,
-                toolIdentity),
+        ManifestDocument manifest = null!;
+        await _progress.RunAsync(
+            "Collecting file metadata",
+            async ct =>
+            {
+                manifest = await manifestBuilder.BuildAsync(
+                    new ManifestBuildRequest(
+                        workspace.ImageDirectory,
+                        msiPath,
+                        sourceHash,
+                        patchMetadata,
+                        WorkDirectoryKept: !workspace.DeleteOnSuccess,
+                        request.MaxParallelism,
+                        toolIdentity),
+                    ct);
+            },
             cancellationToken);
 
         if (outputPaths.StagingManifestPath is not null)
@@ -68,7 +87,10 @@ public sealed class ExtractService(
             await manifestRepository.WriteToPathAsync(manifest, outputPaths.StagingManifestPath, cancellationToken);
         }
 
-        await archiveBuilder.CreateAsync(outputPaths.StagingArchivePath, workspace.ImageDirectory, workspace.LogsDirectory, manifest, cancellationToken);
+        await _progress.RunAsync(
+            "Creating archive",
+            ct => archiveBuilder.CreateAsync(outputPaths.StagingArchivePath, workspace.ImageDirectory, workspace.LogsDirectory, manifest, ct),
+            cancellationToken);
 
         if (outputPaths.StagingManifestPath is not null && outputPaths.ManifestPath is not null)
         {

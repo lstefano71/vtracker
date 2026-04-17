@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ConsoleAppFramework;
+using Spectre.Console;
 using VTracker.Core;
 
 namespace VTracker.Cli;
@@ -63,23 +64,61 @@ public sealed class VTrackerCommands(
     /// </summary>
     /// <param name="left">Left-hand input path (.zip or .json).</param>
     /// <param name="right">Right-hand input path (.zip or .json).</param>
-    /// <param name="format">Output format: text or json.</param>
+    /// <param name="include">Glob pattern to filter displayed files. Repeat for OR semantics (e.g. --include "**/*.dll"). Summary counts are always shown in full.</param>
+    /// <param name="format">Output format: text, json, or pretty. Defaults to pretty for interactive terminals and text otherwise.</param>
     [Command("compare")]
     public async Task<int> Compare(
         string left,
         string right,
-        OutputFormat format = OutputFormat.Text,
+        string[]? include = null,
+        CompareOutputFormat? format = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await compareService.CompareAsync(new CompareRequest(left, right, format), cancellationToken);
+        var effectiveFormat = format ?? (Console.IsOutputRedirected ? CompareOutputFormat.Text : CompareOutputFormat.Pretty);
 
-        if (format == OutputFormat.Json)
+        var result = await compareService.CompareAsync(new CompareRequest(left, right), cancellationToken);
+
+        // Apply include filters — provenance differences are never filtered (they are not file paths)
+        var patterns = include ?? Array.Empty<string>();
+        var filteredAdded = GlobFilter.FilterPaths(result.Added, patterns);
+        var filteredRemoved = GlobFilter.FilterPaths(result.Removed, patterns);
+        var filteredUpdated = GlobFilter.FilterUpdated(result.Updated, patterns);
+
+        var hiddenCount = (result.Added.Length - filteredAdded.Length)
+            + (result.Removed.Length - filteredRemoved.Length)
+            + (result.Updated.Length - filteredUpdated.Length);
+
+        // Build the display result: filtered arrays but original (unfiltered) summary counts
+        var displayResult = new CompareResult
         {
-            Console.Out.WriteLine(JsonSerializer.Serialize(result, VTrackerJsonContext.Default.CompareResult));
-        }
-        else
+            Summary = result.Summary,
+            Added = filteredAdded,
+            Removed = filteredRemoved,
+            Updated = filteredUpdated,
+            ProvenanceDifferences = result.ProvenanceDifferences,
+        };
+
+        switch (effectiveFormat)
         {
-            Console.Out.WriteLine(CompareTextFormatter.Format(result));
+            case CompareOutputFormat.Json:
+                Console.Out.WriteLine(JsonSerializer.Serialize(displayResult, VTrackerJsonContext.Default.CompareResult));
+                break;
+
+            case CompareOutputFormat.Pretty:
+                try
+                {
+                    ComparePrettyFormatter.Write(AnsiConsole.Console, displayResult, hiddenCount);
+                }
+                catch
+                {
+                    // Spectre rendering failed — degrade to plain text
+                    Console.Out.WriteLine(CompareTextFormatter.Format(displayResult, hiddenCount));
+                }
+                break;
+
+            default:
+                Console.Out.WriteLine(CompareTextFormatter.Format(displayResult, hiddenCount));
+                break;
         }
 
         return 0;

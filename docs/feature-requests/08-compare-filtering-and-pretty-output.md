@@ -1,7 +1,7 @@
 # Compare Filtering and Pretty Output
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Make `compare` easier to use for focused binary reviews while preserving automation-friendly output modes.

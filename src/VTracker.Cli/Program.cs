@@ -1,5 +1,6 @@
 using ConsoleAppFramework;
 using Microsoft.Extensions.DependencyInjection;
+using Spectre.Console;
 using VTracker.Cli;
 using VTracker.Core;
 
@@ -26,6 +27,17 @@ try
             services.AddSingleton<ManifestComparator>();
             services.AddSingleton<CompareService>();
             services.AddSingleton<ExtractService>();
+
+            // Use the richer reporter for interactive terminals; plain text otherwise
+            if (!Console.IsOutputRedirected)
+            {
+                services.AddSingleton<IAnsiConsole>(_ => AnsiConsole.Console);
+                services.AddSingleton<IExtractProgressReporter, SpectreExtractProgressReporter>();
+            }
+            else
+            {
+                services.AddSingleton<IExtractProgressReporter, PlainExtractProgressReporter>();
+            }
         });
 
     app.UseFilter<StartupBannerFilter>();

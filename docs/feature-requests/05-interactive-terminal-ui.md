@@ -1,7 +1,7 @@
 # Interactive Terminal UI
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Give VTracker a more modern terminal experience without turning it into a full-screen terminal application.

@@ -89,7 +89,33 @@ vtracker compare `
   --format json
 ```
 
+Filter to specific file types with `--include` (repeatable, OR semantics, case-insensitive glob):
+
+```powershell
+vtracker compare `
+  --left old.zip `
+  --right new.zip `
+  --include "**/*.dll" `
+  --include "**/*.exe"
+```
+
 `compare` accepts either ZIP archives or standalone manifest JSON files. A successful comparison returns exit code `0` even when differences are found; nonzero exit codes are reserved for actual errors.
+
+Key `compare` options:
+
+- `--left <path>`: required left-hand input (`.zip` or `.json`)
+- `--right <path>`: required right-hand input (`.zip` or `.json`)
+- `--include <glob>`: repeatable include filter; OR semantics; case-insensitive; matched against `/`-separated manifest paths. Summary counts always reflect unfiltered totals.
+- `--format <text|json|pretty>`: output format. Defaults to `pretty` for interactive terminals and `text` for redirected output.
+
+## Interactive terminal UI
+
+When running in an interactive terminal (`extract` and `compare` commands), VTracker uses [Spectre.Console](https://spectreconsole.net/) for richer output:
+
+- **`extract`**: shows a spinner and step description for each major workflow step (creating administrative image, applying patches, collecting metadata, creating archive). If a Windows Installer log file is available, the last log line is shown live in the spinner. Falls back to plain step output on any rendering failure.
+- **`compare`**: defaults to `--format pretty`, which uses colour-coded output (green `+`, red `-`, yellow `~`) with size and version details for updated files.
+
+When output is redirected (CI, scripts, pipes), VTracker reverts to plain text automatically.
 
 ## Manifest and compare semantics
 

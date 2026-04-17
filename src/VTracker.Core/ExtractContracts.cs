@@ -2,12 +2,6 @@ namespace VTracker.Core;
 
 public sealed record ToolIdentity(string Name, string Version);
 
-public enum OutputFormat
-{
-    Text,
-    Json,
-}
-
 public sealed record ExtractRequest(
     string MsiPath,
     IReadOnlyList<string> PatchPaths,
@@ -26,5 +20,4 @@ public sealed record ExtractResult(
 
 public sealed record CompareRequest(
     string LeftPath,
-    string RightPath,
-    OutputFormat Format);
+    string RightPath);

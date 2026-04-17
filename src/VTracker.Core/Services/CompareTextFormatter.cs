@@ -4,7 +4,7 @@ namespace VTracker.Core;
 
 public static class CompareTextFormatter
 {
-    public static string Format(CompareResult result)
+    public static string Format(CompareResult result, int hiddenCount = 0)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"Added: {result.Summary.Added}");
@@ -39,6 +39,12 @@ public static class CompareTextFormatter
             {
                 builder.AppendLine($"! {difference}");
             }
+        }
+
+        if (hiddenCount > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine($"({hiddenCount} file {(hiddenCount == 1 ? "row" : "rows")} hidden by --include filter)");
         }
 
         return builder.ToString().TrimEnd();

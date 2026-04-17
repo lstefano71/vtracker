@@ -60,8 +60,7 @@ public sealed class ManifestComparatorTests
             () => service.CompareAsync(
                 new CompareRequest(
                     @"D:\missing-left.json",
-                    @"D:\missing-right.json",
-                    OutputFormat.Text),
+                    @"D:\missing-right.json"),
                 CancellationToken.None));
 
         Assert.Contains("Left input", exception.Message);
