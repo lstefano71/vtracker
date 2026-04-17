@@ -1,7 +1,7 @@
 # Archive Installer Logs
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Preserve `msiexec` logs inside successful archives so support and diagnostics do not depend on a retained work directory.

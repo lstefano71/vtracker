@@ -1,7 +1,7 @@
 # Manifest Extraction CreatedUtc
 
 ## Status
-Accepted future request.
+Implemented.
 
 ## Goal
 Record when a manifest was produced without changing the current ownership of tool metadata.

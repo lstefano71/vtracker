@@ -45,6 +45,8 @@ public sealed class ManifestExtractionInfo
     public bool WorkDirKept { get; init; }
 
     public required string Compression { get; init; }
+
+    public required DateTime CreatedUtc { get; init; }
 }
 
 public sealed class ManifestFileEntry

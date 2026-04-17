@@ -9,6 +9,7 @@ public sealed class ArchiveBuilder(ManifestRepository manifestRepository)
     public async Task CreateAsync(
         string archivePath,
         string imageRootPath,
+        string logsDirectory,
         ManifestDocument manifest,
         CancellationToken cancellationToken)
     {
@@ -37,6 +38,25 @@ public sealed class ArchiveBuilder(ManifestRepository manifestRepository)
                 });
             await using var entryStream = entry.Open();
             await sourceStream.CopyToAsync(entryStream, cancellationToken);
+        }
+
+        foreach (var logPath in Directory.EnumerateFiles(logsDirectory).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+        {
+            var entryName = $"_logs/{Path.GetFileName(logPath)}";
+            var logEntry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
+            logEntry.LastWriteTime = ToZipTimestamp(File.GetLastWriteTimeUtc(logPath));
+
+            await using var logStream = new FileStream(
+                logPath,
+                new FileStreamOptions
+                {
+                    Access = FileAccess.Read,
+                    Mode = FileMode.Open,
+                    Share = FileShare.Read,
+                    Options = FileOptions.SequentialScan,
+                });
+            await using var logEntryStream = logEntry.Open();
+            await logStream.CopyToAsync(logEntryStream, cancellationToken);
         }
 
         var manifestEntry = archive.CreateEntry("_manifest.json", CompressionLevel.Optimal);

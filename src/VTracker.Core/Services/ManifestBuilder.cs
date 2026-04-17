@@ -73,6 +73,7 @@ public sealed class ManifestBuilder(
                 Mode = "administrative-image",
                 WorkDirKept = request.WorkDirectoryKept,
                 Compression = "Optimal",
+                CreatedUtc = DateTime.UtcNow,
             },
             Files = orderedFiles,
         };

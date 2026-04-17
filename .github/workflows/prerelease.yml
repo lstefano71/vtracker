@@ -57,17 +57,17 @@ jobs:
           $sha = "${{ steps.id.outputs.sha }}"
           $mergeBase = git merge-base origin/main HEAD 2>$null
           if ($mergeBase) {
-            $commits = git log --pretty=format:"- %s" "$mergeBase..HEAD"
+            [string[]]$commits = git log --pretty=format:"- %s" "$mergeBase..HEAD"
           } else {
-            $commits = git log --pretty=format:"- %s" HEAD
+            [string[]]$commits = git log --pretty=format:"- %s" HEAD
           }
-          if (-not $commits) { $commits = "*(no new commits ahead of main)*" }
-          @"
-          Preview build from branch ``$branch`` at commit ``$sha``.
-
-          ### Changes on this branch
-          $commits
-          "@ | Set-Content PRERELEASE_NOTES.md
+          if (-not $commits) { $commits = @("*(no new commits ahead of main)*") }
+          $body = @(
+            "Preview build from branch ``$branch`` at commit ``$sha``.",
+            "",
+            "### Changes on this branch"
+          ) + $commits
+          $body -join "`n" | Set-Content PRERELEASE_NOTES.md
 
       - name: Update rolling prerelease tag
         shell: pwsh

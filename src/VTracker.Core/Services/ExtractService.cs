@@ -68,7 +68,7 @@ public sealed class ExtractService(
             await manifestRepository.WriteToPathAsync(manifest, outputPaths.StagingManifestPath, cancellationToken);
         }
 
-        await archiveBuilder.CreateAsync(outputPaths.StagingArchivePath, workspace.ImageDirectory, manifest, cancellationToken);
+        await archiveBuilder.CreateAsync(outputPaths.StagingArchivePath, workspace.ImageDirectory, workspace.LogsDirectory, manifest, cancellationToken);
 
         if (outputPaths.StagingManifestPath is not null && outputPaths.ManifestPath is not null)
         {

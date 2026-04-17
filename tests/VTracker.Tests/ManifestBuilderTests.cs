@@ -32,5 +32,7 @@ public sealed class ManifestBuilderTests
         Assert.Equal(["bin/alpha.txt", "bin/Zeta.txt"], manifest.Files.Select(file => file.Path).ToArray());
         Assert.All(manifest.Files, file => Assert.Matches("^[0-9a-f]{64}$", file.Sha256));
         Assert.All(manifest.Files, file => Assert.Null(file.FileVersion));
+        Assert.Equal(DateTimeKind.Utc, manifest.Extraction.CreatedUtc.Kind);
+        Assert.True(manifest.Extraction.CreatedUtc <= DateTime.UtcNow);
     }
 }

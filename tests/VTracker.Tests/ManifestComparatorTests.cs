@@ -67,6 +67,19 @@ public sealed class ManifestComparatorTests
         Assert.Contains("Left input", exception.Message);
     }
 
+    [Fact]
+    public void Compare_CreatedUtcDifferenceIsNotAProvenanceDifference()
+    {
+        var comparator = new ManifestComparator();
+
+        var left = CreateManifest(@"D:\releases\r1\setup.msi", "aaaa", Array.Empty<ManifestPatchInfo>(), []);
+        var right = CreateManifest(@"D:\releases\r1\setup.msi", "aaaa", Array.Empty<ManifestPatchInfo>(), []);
+
+        var result = comparator.Compare(left, right);
+
+        Assert.Empty(result.ProvenanceDifferences);
+    }
+
     private static ManifestDocument CreateManifest(string sourcePath, string sourceHash, ManifestPatchInfo[] patches, ManifestFileEntry[] files)
     {
         return new ManifestDocument
@@ -87,6 +100,7 @@ public sealed class ManifestComparatorTests
                 Mode = "administrative-image",
                 WorkDirKept = false,
                 Compression = "Optimal",
+                CreatedUtc = DateTime.UtcNow,
             },
             Files = files,
         };

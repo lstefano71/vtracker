@@ -140,6 +140,7 @@ public sealed class ManifestRepository(
                 Mode = manifest.Extraction.Mode,
                 WorkDirKept = manifest.Extraction.WorkDirKept,
                 Compression = manifest.Extraction.Compression,
+                CreatedUtc = manifest.Extraction.CreatedUtc,
             },
             Files = normalizedFiles
                 .OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
