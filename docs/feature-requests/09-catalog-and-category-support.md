@@ -1,7 +1,7 @@
 # Catalog and Category Support
 
 ## Status
-Pending.
+Implemented.
 
 ## Goal
 Allow files in a manifest or archive to be classified into named categories so that comparisons can be understood in terms of product modules, partial archives can be unpacked by category, and the classification survives across releases of the same product.

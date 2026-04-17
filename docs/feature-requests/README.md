@@ -21,7 +21,4 @@ Feature request files:
 - `06-startup-version-banner.md`
 - `07-manifest-extraction-created-utc.md`
 - `08-compare-filtering-and-pretty-output.md`
-
-**Pending**
-
 - `09-catalog-and-category-support.md`

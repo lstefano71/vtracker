@@ -1,14 +1,16 @@
 # VTracker
 
-VTracker is a Windows-only .NET 10 CLI for archiving and comparing MSI-delivered file trees without installing the product. It creates a Windows Installer administrative image, optionally applies patches in caller-defined order, builds a deterministic manifest for the extracted files, packages the result into a ZIP, and compares two manifests or archives.
+VTracker is a Windows-only .NET 10 CLI for archiving and comparing MSI-delivered file trees without installing the product. It creates a Windows Installer administrative image, optionally applies patches in caller-defined order, builds a deterministic manifest for the extracted files, packages the result into a ZIP, and compares two manifests or archives. An optional catalog system classifies files into named categories so that comparisons can be understood per module and files can be selectively unpacked.
 
 ## What it does
 
 - Extracts the effective file tree of a base MSI by using `msiexec /a`
 - Applies zero or more patches in the exact order you provide
 - Generates a deterministic manifest with normalized relative paths, file sizes, SHA-256 hashes, timestamps, and PE version metadata for `.dll` and `.exe` files
+- Classifies files into named categories when a catalog CSV is provided
 - Writes `_manifest.json` at the ZIP root and can also emit a standalone `.manifest.json`
-- Compares two manifests or archives and reports added, removed, updated, and provenance-difference findings
+- Compares two manifests or archives and reports added, removed, updated, and provenance-difference findings, with optional per-category breakdown
+- Unpacks files belonging to a specific category from an archive
 
 ## Requirements
 
@@ -50,6 +52,16 @@ vtracker extract `
   --emit-manifest
 ```
 
+Extract with catalog classification:
+
+```powershell
+vtracker extract `
+  --msi "L:\Dyalog19.0\windows_64_19.0.49959_unicode\setup_64_unicode.msi" `
+  --patch "L:\Dyalog19.0\windows_64_19.0.49959_unicode\patch_19.0.49959.0_64_unicode_2024.08.06.msd" `
+  --catalog "D:\Catalogs\dyalog.catalog.csv" `
+  --emit-manifest
+```
+
 Key `extract` options:
 
 - `--msi <path>`: required base MSI
@@ -59,6 +71,7 @@ Key `extract` options:
 - `--keep-work-dir`: retain the work directory on success
 - `--emit-manifest`: also write `<archive-name>.manifest.json`
 - `--max-parallelism <n>`: override hashing and metadata concurrency
+- `--catalog <path>`: catalog CSV for file classification; auto-discovers `vtracker.catalog.csv` from the current directory when omitted
 
 Default `extract` behavior:
 
@@ -78,6 +91,15 @@ The generated ZIP contains:
 vtracker compare `
   --left "D:\Archives\windows_64_19.0.49959_unicode.zip" `
   --right "D:\Archives\windows_64_19.0.50000_unicode.zip"
+```
+
+Compare with per-category breakdown:
+
+```powershell
+vtracker compare `
+  --left "D:\Archives\windows_64_19.0.49959_unicode.zip" `
+  --right "D:\Archives\windows_64_19.0.50000_unicode.zip" `
+  --catalog "D:\Catalogs\dyalog.catalog.csv"
 ```
 
 JSON output for automation:
@@ -107,6 +129,90 @@ Key `compare` options:
 - `--right <path>`: required right-hand input (`.zip` or `.json`)
 - `--include <glob>`: repeatable include filter; OR semantics; case-insensitive; matched against `/`-separated manifest paths. Summary counts always reflect unfiltered totals.
 - `--format <text|json|pretty>`: output format. Defaults to `pretty` for interactive terminals and `text` for redirected output.
+- `--catalog <path>`: catalog CSV for per-category breakdown; auto-discovers `vtracker.catalog.csv` from the current directory when omitted
+
+### Catalog management
+
+The catalog is a three-column CSV (`type,pattern,category`) that classifies manifest files into named categories. Rows are evaluated in order; the first match wins. Unmatched files are classified as `Unclassified`. Patterns can be globs (`G`) or regexes (`R`), both case-insensitive.
+
+#### Initialise a catalog from a manifest
+
+```powershell
+vtracker catalog init `
+  --manifest "D:\Archives\windows_64_19.0.49959_unicode.zip" `
+  --out "dyalog.catalog.csv"
+```
+
+Creates one exact-path row per file, all assigned to `Unclassified`. This is the starting point for manual classification.
+
+#### Check for dead patterns
+
+```powershell
+vtracker catalog check `
+  --catalog "dyalog.catalog.csv" `
+  --manifest "D:\Archives\windows_64_19.0.50000_unicode.zip"
+```
+
+Reports catalog patterns that match zero files in the given manifest — useful after a new release adds or removes files.
+
+#### Show catalog contents
+
+```powershell
+vtracker catalog show --catalog "dyalog.catalog.csv"
+vtracker catalog show --catalog "dyalog.catalog.csv" --category HTMLRenderer
+```
+
+#### Compact exact paths into broader patterns
+
+```powershell
+vtracker catalog compact `
+  --catalog "dyalog.catalog.csv" `
+  --manifest "D:\Archives\windows_64_19.0.49959_unicode.zip"
+```
+
+Interactive command that groups exact-path entries by category and prompts for replacement glob patterns.
+
+#### Export a clean CSV
+
+```powershell
+vtracker catalog export `
+  --catalog "dyalog.catalog.csv" `
+  --out "dyalog.catalog.clean.csv"
+```
+
+Re-serialises the catalog with RFC 4180 quoting — useful for spreadsheet interchange.
+
+### Unpack files by category
+
+```powershell
+vtracker unpack `
+  --from "D:\Archives\windows_64_19.0.50000_unicode.zip" `
+  --catalog "D:\Catalogs\dyalog.catalog.csv" `
+  --category HTMLRenderer `
+  --out "D:\Staging\htmlrenderer"
+```
+
+Preview what would be extracted without writing files:
+
+```powershell
+vtracker unpack `
+  --from "D:\Archives\windows_64_19.0.50000_unicode.zip" `
+  --catalog "D:\Catalogs\dyalog.catalog.csv" `
+  --category HTMLRenderer `
+  --out "D:\Staging\htmlrenderer" `
+  --dry-run
+```
+
+Key `unpack` options:
+
+- `--from <zip>`: source ZIP archive (standalone manifests cannot be used — they contain no file content)
+- `--catalog <path>`: catalog CSV; auto-discovers `vtracker.catalog.csv` from the current directory when omitted
+- `--category <name>`: category to extract (case-insensitive)
+- `--out <dir>`: output directory
+- `--strip-prefix <prefix>`: remove a leading path prefix from extracted paths
+- `--dry-run`: print the extraction plan without writing files
+
+When `--strip-prefix` is omitted in an interactive terminal, VTracker detects the longest common path prefix and prompts whether to strip it.
 
 ## Interactive terminal UI
 
@@ -114,6 +220,8 @@ When running in an interactive terminal (`extract` and `compare` commands), VTra
 
 - **`extract`**: shows a spinner and step description for each major workflow step (creating administrative image, applying patches, collecting metadata, creating archive). If a Windows Installer log file is available, the last log line is shown live in the spinner. Falls back to plain step output on any rendering failure.
 - **`compare`**: defaults to `--format pretty`, which uses colour-coded output (green `+`, red `-`, yellow `~`) with size and version details for updated files.
+- **`catalog show`** and **`catalog check`**: render formatted tables in interactive terminals; fall back to plain text when redirected.
+- **`catalog compact`** and **`unpack`**: use interactive prompts (require a TTY).
 
 When output is redirected (CI, scripts, pipes), VTracker reverts to plain text automatically.
 
@@ -126,14 +234,15 @@ When output is redirected (CI, scripts, pipes), VTracker reverts to plain text a
 - `fileVersion` and `productVersion` are captured for `.dll` and `.exe` when available, otherwise `null`
 - Patch order is preserved exactly as provided by the caller
 - Path-collision and file-read/hash failures are treated as hard errors
+- When a catalog is active during `extract`, each file entry gains a `category` field and the manifest schema version is `2`; version-1 manifests (no catalog) remain fully supported
 
 ## Repository layout
 
 ```text
-src\VTracker.Cli   CLI entry point and command surface
-src\VTracker.Core  extraction, manifest, archive, compare, and utility services
-tests\VTracker.Tests  unit and integration coverage
-docs\              product and implementation reference documents
+src\VTracker.Cli       CLI entry point and command surface
+src\VTracker.Core      extraction, manifest, archive, compare, catalog, and unpack services
+tests\VTracker.Tests   unit and integration coverage
+docs\                  product and implementation reference documents
 ```
 
 ## License
