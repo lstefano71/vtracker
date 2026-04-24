@@ -58,7 +58,7 @@ jobs:
             git log --pretty=format:"- %s" | Set-Content RELEASE_NOTES.md
           }
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2.6.2
         with:
           body_path: RELEASE_NOTES.md
           files: |
