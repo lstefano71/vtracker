@@ -9,6 +9,7 @@ namespace VTracker.Cli;
 public sealed class VTrackerCommands(
     ExtractService extractService,
     CompareService compareService,
+    CompareExportService compareExportService,
     ToolIdentity toolIdentity)
 {
     /// <summary>
@@ -70,6 +71,7 @@ public sealed class VTrackerCommands(
     /// <param name="include">Glob pattern to filter displayed files. Repeat for OR semantics (e.g. --include "**/*.dll"). Summary counts are always shown in full.</param>
     /// <param name="format">Output format: text, json, or pretty. Defaults to pretty for interactive terminals and text otherwise.</param>
     /// <param name="catalog">Path to a catalog CSV file for per-category breakdown. Auto-discovers vtracker.catalog.csv from CWD when omitted.</param>
+    /// <param name="exportZip">When specified, writes the added and updated files (after applying --include filters) from the right-hand ZIP into a new self-contained ZIP at this path. Requires --right to be a .zip archive.</param>
     [Command("compare")]
     public async Task<int> Compare(
         string left,
@@ -77,6 +79,7 @@ public sealed class VTrackerCommands(
         string[]? include = null,
         CompareOutputFormat? format = null,
         string? catalog = null,
+        string? exportZip = null,
         CancellationToken cancellationToken = default)
     {
         var effectiveFormat = format ?? (Console.IsOutputRedirected ? CompareOutputFormat.Text : CompareOutputFormat.Pretty);
@@ -124,6 +127,16 @@ public sealed class VTrackerCommands(
             default:
                 Console.Out.WriteLine(CompareTextFormatter.Format(displayResult, hiddenCount));
                 break;
+        }
+
+        if (exportZip is not null)
+        {
+            var exportPaths = filteredAdded.Select(f => f.Path)
+                .Concat(filteredUpdated.Select(f => f.Path))
+                .ToArray();
+            var exportResult = await compareExportService.ExportAsync(right, exportPaths, exportZip, cancellationToken);
+            // Write export status to stderr so JSON stdout is never polluted
+            Console.Error.WriteLine($"Exported: {exportResult.ExportedFileCount} file(s) → {exportResult.OutputZipPath}");
         }
 
         return 0;

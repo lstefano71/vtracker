@@ -214,7 +214,15 @@ The tool must:
 - Allow CLI overrides for concurrency
 - Be practical for archives containing thousands of files
 
-## Non-Functional Requirements
+### FR-13: Compare Export ZIP
+The compare command must support an `--export-zip <path>` option that:
+
+- Collects the files that are added or updated in the right-hand input (after applying any `--include` filters) and packages them into a new self-contained ZIP at the specified path.
+- Requires the right-hand input to be a `.zip` archive; fails with a clear error when given a standalone `.json` manifest, which contains no file content.
+- Fails if the output ZIP path already exists to prevent silent overwrites.
+- Writes export status (file count and output path) to stderr so that JSON stdout remains unaffected when `--format json` is used.
+- Removes the partial output file if an error occurs mid-write.
+
 
 ### NFR-1: Determinism
 Given the same inputs and patch order, the manifest and compare classification must be deterministic.
@@ -267,6 +275,15 @@ vtracker compare `
   --left "D:\Archives\windows_64_19.0.49959_unicode.manifest.json" `
   --right "D:\Archives\windows_64_19.0.50000_unicode.manifest.json" `
   --format json
+```
+
+### Compare and export changed DLLs to a ZIP
+```powershell
+vtracker compare `
+  --left "D:\Archives\windows_64_19.0.49959_unicode.zip" `
+  --right "D:\Archives\windows_64_19.0.50000_unicode.zip" `
+  --include "**/*.dll,**/*.exe" `
+  --export-zip "D:\diff\v49959-to-v50000-dlls.zip"
 ```
 
 ## Acceptance Criteria

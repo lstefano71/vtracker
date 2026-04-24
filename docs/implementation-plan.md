@@ -88,8 +88,10 @@ Recommended options:
 
 - `--left <path>` (required)
 - `--right <path>` (required)
-- `--format <text|json>` (optional, default `text`)
+- `--format <text|json|pretty>` (optional, default `pretty` for interactive terminals, `text` otherwise)
+- `--include <pattern>` (repeatable, optional) — glob patterns with OR semantics; filters displayed files while showing full summary counts
 - `--catalog <path>` (optional) — path to a catalog CSV for per-category breakdown
+- `--export-zip <path>` (optional) — writes the added and updated files (after applying `--include` filters) from the right-hand ZIP into a new self-contained ZIP; requires `--right` to be a `.zip` archive
 
 Behavior:
 
@@ -97,6 +99,7 @@ Behavior:
 - Return `0` on a successful comparison, even when differences exist.
 - Return nonzero only on actual errors.
 - When a catalog is active, output includes a per-category breakdown of added/removed/updated files. Category-only differences (same SHA-256, different stored category) are reported as provenance differences.
+- When `--export-zip` is given, export status is written to stderr so JSON stdout is never polluted.
 
 ## `unpack`
 Options:

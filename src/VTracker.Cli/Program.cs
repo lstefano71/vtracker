@@ -44,6 +44,7 @@ try
             services.AddSingleton<ArchiveBuilder>();
             services.AddSingleton<ManifestComparator>();
             services.AddSingleton<CompareService>();
+            services.AddSingleton<CompareExportService>();
             services.AddSingleton<ExtractService>();
             services.AddSingleton<UnpackService>();
 
