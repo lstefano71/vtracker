@@ -111,14 +111,13 @@ vtracker compare `
   --format json
 ```
 
-Filter to specific file types with `--include` (repeatable, OR semantics, case-insensitive glob):
+Filter to specific file types with `--include` (comma-separated patterns, OR semantics, case-insensitive glob):
 
 ```powershell
 vtracker compare `
   --left old.zip `
   --right new.zip `
-  --include "**/*.dll" `
-  --include "**/*.exe"
+  --include "**/*.dll,**/*.exe"
 ```
 
 `compare` accepts either ZIP archives or standalone manifest JSON files. A successful comparison returns exit code `0` even when differences are found; nonzero exit codes are reserved for actual errors.
@@ -127,7 +126,7 @@ Key `compare` options:
 
 - `--left <path>`: required left-hand input (`.zip` or `.json`)
 - `--right <path>`: required right-hand input (`.zip` or `.json`)
-- `--include <glob>`: repeatable include filter; OR semantics; case-insensitive; matched against `/`-separated manifest paths. Summary counts always reflect unfiltered totals.
+- `--include <glob[,glob...]>`: include filters in a single comma-separated argument; OR semantics; case-insensitive; matched against `/`-separated manifest paths. Summary counts always reflect unfiltered totals.
 - `--format <text|json|pretty>`: output format. Defaults to `pretty` for interactive terminals and `text` for redirected output.
 - `--catalog <path>`: catalog CSV for per-category breakdown; auto-discovers `vtracker.catalog.csv` from the current directory when omitted
 

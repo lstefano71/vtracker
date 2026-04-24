@@ -7,9 +7,8 @@ Implemented.
 Make `compare` easier to use for focused binary reviews while preserving automation-friendly output modes.
 
 ## Agreed Direction
-- Add repeatable include filters such as:
-  - `--include "**/*.dll"`
-  - `--include "**/*.exe"`
+- Add include filters using CAF-style comma-separated patterns, such as:
+  - `--include "**/*.dll,**/*.exe"`
 - Match globs against normalized manifest paths using `/` separators.
 - Evaluate globs case-insensitively to match Windows expectations.
 - Use `DotNet.Glob` for matching.
@@ -21,7 +20,7 @@ Make `compare` easier to use for focused binary reviews while preserving automat
 - For updated files, show left-to-right size and version information.
 
 ## Implementation Notes
-- Repeated include patterns should use OR semantics.
+- Comma-separated include patterns should use OR semantics.
 - When filters hide some detail rows, show enough context in the output to make the mismatch between total counts and displayed rows understandable.
 - Keep the plain `text` mode available for simple and legacy terminal use.
 

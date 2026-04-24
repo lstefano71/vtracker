@@ -76,8 +76,7 @@ To focus on DLLs and EXEs only:
 vtracker compare `
   --left "windows_64_20.0.50000_unicode.zip" `
   --right "windows_64_20.0.50000_unicode_patched.zip" `
-  --include "**/*.dll" `
-  --include "**/*.exe"
+  --include "**/*.dll,**/*.exe"
 ```
 
 For machine-readable output (e.g. to feed into a script):
